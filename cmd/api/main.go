@@ -40,9 +40,15 @@ func main() {
 	authService := services.NewAuthService(userRepo)
 	userHandler := handlers.NewUserHandler(userRepo, authService)
 	authMiddleware := middleware.NewAuthMiddleware(authService)
+	securityMiddleware := middleware.NewSecurityMiddleware()
 
 	// Configuração do router
 	router := gin.Default()
+
+	// Aplicar middlewares de segurança
+	router.Use(securityMiddleware.SecurityHeaders())
+	router.Use(securityMiddleware.RateLimit())
+	router.Use(securityMiddleware.CORS())
 
 	// Configuração das rotas
 	routes.SetupRoutes(router, userHandler, authMiddleware)
