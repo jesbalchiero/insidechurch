@@ -10,6 +10,8 @@ import (
 	"insidechurch/internal/services"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -33,6 +35,8 @@ func main() {
 
 	// Configuração das rotas
 	routes.SetupRoutes(router, userHandler, authMiddleware)
+
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Inicialização do servidor
 	if err := router.Run(":8080"); err != nil {

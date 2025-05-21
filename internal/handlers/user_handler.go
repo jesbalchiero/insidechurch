@@ -42,17 +42,17 @@ type AuthResponse struct {
 	} `json:"user"`
 }
 
-// Register cria um novo usuário
-// @Summary Registrar novo usuário
-// @Description Cria um novo usuário com email, senha e nome
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param user body RegisterRequest true "Dados do usuário"
-// @Success 201 {object} AuthResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-// @Router /auth/register [post]
+// Register godoc
+// @Summary      Registrar novo usuário
+// @Description  Cria um novo usuário na plataforma
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        input  body  RegisterRequest  true  "Dados de registro"
+// @Success      201  {object}  RegisterResponse
+// @Failure      400  {object}  gin.H
+// @Failure      409  {object}  gin.H
+// @Router       /api/register [post]
 func (h *UserHandler) Register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -114,17 +114,17 @@ func (h *UserHandler) Register(c *gin.Context) {
 	})
 }
 
-// Login autentica um usuário
-// @Summary Login de usuário
-// @Description Autentica um usuário com email e senha
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param credentials body LoginRequest true "Credenciais do usuário"
-// @Success 200 {object} AuthResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 401 {object} ErrorResponse
-// @Router /auth/login [post]
+// Login godoc
+// @Summary      Login do usuário
+// @Description  Autentica um usuário e retorna um token JWT
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        input  body  LoginRequest  true  "Credenciais de login"
+// @Success      200  {object}  LoginResponse
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Router       /api/login [post]
 func (h *UserHandler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -161,16 +161,15 @@ func (h *UserHandler) Login(c *gin.Context) {
 	})
 }
 
-// GetUser retorna os dados do usuário autenticado
-// @Summary Buscar usuário
-// @Description Retorna os dados do usuário autenticado
-// @Tags users
-// @Security BearerAuth
-// @Produce json
-// @Success 200 {object} AuthResponse
-// @Failure 401 {object} ErrorResponse
-// @Failure 404 {object} ErrorResponse
-// @Router /users/me [get]
+// GetUser godoc
+// @Summary      Buscar usuário autenticado
+// @Description  Retorna os dados do usuário autenticado
+// @Tags         user
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  UserResponse
+// @Failure      401  {object}  gin.H
+// @Router       /api/user [get]
 func (h *UserHandler) GetUser(c *gin.Context) {
 	// Obter ID do usuário do contexto (definido pelo middleware de autenticação)
 	userID, exists := c.Get("userID")
