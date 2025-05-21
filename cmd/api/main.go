@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"os"
 
 	"insidechurch/internal/handlers"
 	"insidechurch/internal/middleware"
@@ -10,6 +10,8 @@ import (
 	"insidechurch/internal/services"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
+	"github.com/sirupsen/logrus"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"gorm.io/driver/postgres"
@@ -17,11 +19,20 @@ import (
 )
 
 func main() {
-	// Configuração do banco de dados
-	dsn := "host=localhost user=postgres password=postgres dbname=insidechurch port=5432 sslmode=disable"
+	// Carregar variáveis de ambiente
+	if err := godotenv.Load(); err != nil {
+		logrus.Warn("Arquivo .env não encontrado, usando variáveis do sistema.")
+	}
+
+	// Configurar logger
+	logrus.SetFormatter(&logrus.TextFormatter{FullTimestamp: true})
+	logrus.SetLevel(logrus.InfoLevel)
+
+	// Configuração do banco de dados usando variáveis de ambiente
+	dsn := os.ExpandEnv("host=${DB_HOST} user=${DB_USER} password=${DB_PASSWORD} dbname=${DB_NAME} port=${DB_PORT} sslmode=${DB_SSLMODE}")
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatal("Erro ao conectar ao banco de dados:", err)
+		logrus.Fatalf("Erro ao conectar ao banco de dados: %v", err)
 	}
 
 	// Inicialização dos componentes
@@ -38,8 +49,14 @@ func main() {
 
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	// Inicialização do servidor
-	if err := router.Run(":8080"); err != nil {
-		log.Fatal("Erro ao iniciar o servidor:", err)
+	// Porta do servidor
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	logrus.Infof("Servidor iniciado na porta %s", port)
+	if err := router.Run(":" + port); err != nil {
+		logrus.Fatalf("Erro ao iniciar o servidor: %v", err)
 	}
 }
