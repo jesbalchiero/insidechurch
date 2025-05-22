@@ -13,6 +13,8 @@ export default defineNuxtConfig({
   postcss: {
     plugins: {
       '@tailwindcss/forms': {},
+      tailwindcss: {},
+      autoprefixer: {},
     },
   },
   app: {
