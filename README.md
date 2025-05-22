@@ -219,3 +219,64 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 Seu Nome - [@seutwitter](https://twitter.com/seutwitter) - email@exemplo.com
 
 Link do Projeto: [https://github.com/seu-usuario/insidechurch](https://github.com/seu-usuario/insidechurch)
+
+## Ambiente de Desenvolvimento
+
+### Requisitos
+- Docker
+- Docker Compose
+- Node.js 18+
+- Go 1.21+
+
+### Portas
+- Frontend: http://localhost:3000
+- Backend: http://localhost:8080
+- PostgreSQL: localhost:5432
+
+### Comandos Docker
+
+#### Desenvolvimento
+Para iniciar o ambiente de desenvolvimento com Docker:
+
+```bash
+# Usar o script de desenvolvimento
+./scripts/docker-dev.sh
+
+# Ou manualmente
+docker-compose down
+docker-compose build --no-cache
+docker-compose up
+```
+
+#### Produção
+Para build de produção:
+
+```bash
+# Build das imagens
+docker-compose -f docker-compose.prod.yml build
+
+# Iniciar serviços
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+### Variáveis de Ambiente
+
+#### Backend
+- `DB_HOST`: Host do PostgreSQL (default: postgres)
+- `DB_USER`: Usuário do PostgreSQL (default: postgres)
+- `DB_PASSWORD`: Senha do PostgreSQL (default: postgres)
+- `DB_NAME`: Nome do banco de dados (default: insidechurch)
+- `DB_PORT`: Porta do PostgreSQL (default: 5432)
+- `JWT_SECRET`: Chave secreta para JWT
+
+#### Frontend
+- `NUXT_PUBLIC_API_BASE`: URL base da API (default: http://localhost:8080)
+
+### Estrutura do Projeto
+```
+.
+├── backend/           # API Go
+├── frontend/         # Frontend Nuxt.js
+├── scripts/          # Scripts de desenvolvimento
+└── docker-compose.yml
+```

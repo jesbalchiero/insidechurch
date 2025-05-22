@@ -19,31 +19,34 @@ COPY . .
 RUN yarn build
 
 # Production stage
-FROM nginx:1.25.3-alpine3.19
+FROM node:20.11.1-alpine3.19-slim
 
-# Add security headers
-RUN echo "server_tokens off;" > /etc/nginx/conf.d/security.conf
+# Add non-root user
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Copy built assets from builder stage
-COPY --from=builder /app/.output/public /usr/share/nginx/html
+WORKDIR /app
 
-# Copy nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy only necessary files
+COPY --from=builder /app/.output ./.output
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/yarn.lock ./
+
+# Install production dependencies
+RUN yarn install --frozen-lockfile --production && \
+    yarn cache clean
 
 # Set proper permissions
-RUN chown -R nginx:nginx /usr/share/nginx/html && \
-    chmod -R 755 /usr/share/nginx/html && \
-    chown -R nginx:nginx /var/cache/nginx && \
-    chown -R nginx:nginx /var/log/nginx && \
-    chown -R nginx:nginx /etc/nginx/conf.d && \
-    touch /var/run/nginx.pid && \
-    chown -R nginx:nginx /var/run/nginx.pid
+RUN chown -R appuser:appgroup /app
 
 # Switch to non-root user
-USER nginx
+USER appuser
 
-# Expose port 80
-EXPOSE 80
+# Expose port
+EXPOSE 3000
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"] 
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
+
+# Start command
+CMD ["node", ".output/server/index.mjs"] 
