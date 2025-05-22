@@ -1,8 +1,10 @@
 import type { NitroFetchOptions } from 'nitropack'
+import { useAuthStore } from '~/stores/auth'
 
 export const useApi = () => {
   const config = useRuntimeConfig()
   const router = useRouter()
+  const auth = useAuthStore()
 
   const baseFetch = $fetch.create({
     baseURL: config.public.apiBase as string,
@@ -19,11 +21,9 @@ export const useApi = () => {
       headers?: Record<string, string>
     } = {}
   ) => {
-    const token = localStorage.getItem('token')
-
     const headers: Record<string, string> = {
       ...(options.headers || {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(auth.token ? { Authorization: `Bearer ${auth.token}` } : {}),
     }
 
     try {
@@ -33,7 +33,7 @@ export const useApi = () => {
       })
     } catch (error: any) {
       if (error.statusCode === 401) {
-        localStorage.removeItem('token')
+        auth.clearAuth()
         router.push('/login')
       }
       throw error

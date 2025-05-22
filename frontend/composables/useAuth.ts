@@ -1,21 +1,21 @@
 import type { User, LoginRequest, RegisterRequest } from '~/types'
 import { useApi } from './useApi'
 import { useToast } from './useToast'
+import { useAuthStore } from '~/stores/auth'
 
 export const useAuth = () => {
   const api = useApi()
   const toast = useToast()
-  const user = useState<User | null>('user', () => null)
+  const auth = useAuthStore()
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await api.fetch<{ token: string }>('/api/login', {
+      const response = await api.fetch<{ token: string; user: User }>('/api/login', {
         method: 'POST',
         body: { email, password } as LoginRequest,
       })
 
-      localStorage.setItem('token', response.token)
-      await getUser()
+      auth.setAuth(response)
       toast.success('Login realizado com sucesso!')
       return response
     } catch (error: any) {
@@ -26,13 +26,12 @@ export const useAuth = () => {
 
   const register = async (email: string, password: string, name: string) => {
     try {
-      const response = await api.fetch<{ token: string }>('/api/register', {
+      const response = await api.fetch<{ token: string; user: User }>('/api/register', {
         method: 'POST',
         body: { email, password, name } as RegisterRequest,
       })
 
-      localStorage.setItem('token', response.token)
-      await getUser()
+      auth.setAuth(response)
       toast.success('Cadastro realizado com sucesso!')
       return response
     } catch (error: any) {
@@ -44,24 +43,24 @@ export const useAuth = () => {
   const getUser = async () => {
     try {
       const response = await api.fetch<User>('/api/user')
-      user.value = response
+      auth.setUser(response)
       return response
     } catch (error: any) {
       if (error.statusCode === 401) {
-        user.value = null
+        auth.clearAuth()
       }
       throw error
     }
   }
 
   const logout = () => {
-    localStorage.removeItem('token')
-    user.value = null
+    auth.clearAuth()
     toast.info('Logout realizado com sucesso!')
   }
 
   return {
-    user,
+    user: auth.user,
+    isAuthenticated: auth.isAuthenticated,
     login,
     register,
     getUser,
