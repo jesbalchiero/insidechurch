@@ -1,14 +1,13 @@
-# Etapa 1: build
-FROM golang:1.21.8-alpine3.19 AS builder
+# Build stage
+FROM golang:1.23 AS builder
+
 WORKDIR /app
 
-# Instalar dependências de segurança e build
-RUN apk add --no-cache \
-    ca-certificates \
-    tzdata \
-    git
+# Instalar dependências necessárias
+RUN apt-get update && apt-get install -y git ca-certificates tzdata && \
+    update-ca-certificates
 
-# Copiar e baixar dependências
+# Copiar arquivos de dependências
 COPY go.mod go.sum ./
 RUN go mod download
 
@@ -16,34 +15,36 @@ RUN go mod download
 COPY . .
 
 # Compilar a aplicação com flags de segurança
-RUN CGO_ENABLED=0 GOOS=linux go build \
-    -ldflags="-w -s -extldflags=-static" \
-    -o insidechurch ./cmd/api
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o main .
 
-# Etapa 2: imagem final
-FROM alpine:3.19.4
+# Final stage
+FROM alpine:3.19
+
 WORKDIR /app
 
-# Instalar dependências de segurança
-RUN apk add --no-cache \
-    ca-certificates \
-    tzdata
-
 # Criar usuário não-root
-RUN adduser -D -u 1000 appuser
+RUN adduser -D -g '' appuser
+
+# Instalar certificados e timezone
+RUN apk add --no-cache ca-certificates tzdata && \
+    update-ca-certificates
 
 # Copiar binário e configurações
-COPY --from=builder /app/insidechurch .
-COPY .env.example .env
+COPY --from=builder /app/main .
+COPY --from=builder /app/.env .
 
 # Configurar permissões
-RUN chown -R appuser:appuser /app
+RUN chown -R appuser:appuser /app && \
+    chmod -R 755 /app
 
-# Mudar para usuário não-root
 USER appuser
 
-# Configurar variáveis de ambiente
-ENV TZ=UTC
-
+# Expor porta
 EXPOSE 8080
-CMD ["./insidechurch"] 
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+# Comando para executar a aplicação
+CMD ["./main"] 
