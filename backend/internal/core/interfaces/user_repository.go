@@ -1,6 +1,6 @@
 package interfaces
 
-import "insidechurch/internal/core/domain"
+import "insidechurch/backend/internal/core/domain"
 
 type UserRepository interface {
 	Create(user *domain.User) error

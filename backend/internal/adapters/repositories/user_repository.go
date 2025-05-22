@@ -1,7 +1,7 @@
 package repositories
 
 import (
-	"insidechurch/internal/core/domain"
+	"insidechurch/backend/internal/core/domain"
 
 	"gorm.io/gorm"
 )

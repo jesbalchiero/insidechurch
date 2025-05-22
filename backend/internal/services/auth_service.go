@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
-	"insidechurch/internal/core/domain"
-	"insidechurch/internal/core/interfaces"
+	"insidechurch/backend/internal/core/domain"
+	"insidechurch/backend/internal/core/interfaces"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"

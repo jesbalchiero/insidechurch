@@ -3,8 +3,8 @@ package integration
 import (
 	"testing"
 
-	"insidechurch/internal/core/domain"
-	"insidechurch/internal/repositories"
+	"insidechurch/backend/internal/core/domain"
+	"insidechurch/backend/internal/repositories"
 
 	"github.com/stretchr/testify/assert"
 )

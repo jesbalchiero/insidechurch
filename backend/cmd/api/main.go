@@ -3,11 +3,11 @@ package main
 import (
 	"os"
 
-	"insidechurch/internal/handlers"
-	"insidechurch/internal/middleware"
-	"insidechurch/internal/repositories"
-	"insidechurch/internal/routes"
-	"insidechurch/internal/services"
+	"insidechurch/backend/internal/handlers"
+	"insidechurch/backend/internal/middleware"
+	"insidechurch/backend/internal/repositories"
+	"insidechurch/backend/internal/routes"
+	"insidechurch/backend/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"

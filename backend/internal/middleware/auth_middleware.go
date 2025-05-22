@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"insidechurch/internal/services"
+	"insidechurch/backend/internal/services"
 
 	"github.com/gin-gonic/gin"
 )

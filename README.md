@@ -1,9 +1,10 @@
-# InsideChurch API
+# InsideChurch
 
-API REST para gerenciamento de igrejas e membros, desenvolvida em Go.
+Sistema completo para gerenciamento de igrejas e membros, desenvolvido com Go no backend e React no frontend.
 
 ## 🚀 Tecnologias
 
+### Backend
 - Go 1.21
 - Gin (Framework Web)
 - GORM (ORM)
@@ -12,11 +13,18 @@ API REST para gerenciamento de igrejas e membros, desenvolvida em Go.
 - Docker
 - Swagger (Documentação da API)
 
+### Frontend
+- React
+- TypeScript
+- Material-UI
+- Docker
+
 ## 📋 Pré-requisitos
 
 - Go 1.21 ou superior
+- Node.js 18 ou superior
 - PostgreSQL 15
-- Docker e Docker Compose (opcional)
+- Docker e Docker Compose
 
 ## 🔧 Instalação
 
@@ -30,8 +38,11 @@ cd insidechurch
 
 2. Configure as variáveis de ambiente:
 ```bash
-cp .env.example .env
-# Edite o arquivo .env com suas configurações
+# Backend
+cp backend/.env.example backend/.env
+# Frontend
+cp frontend/.env.example frontend/.env
+# Edite os arquivos .env com suas configurações
 ```
 
 3. Inicie os containers:
@@ -41,10 +52,11 @@ docker-compose up -d
 
 ### Instalação Manual
 
-1. Clone o repositório:
+#### Backend
+
+1. Entre na pasta do backend:
 ```bash
-git clone https://github.com/seu-usuario/insidechurch.git
-cd insidechurch
+cd backend
 ```
 
 2. Instale as dependências:
@@ -63,24 +75,48 @@ cp .env.example .env
 go run cmd/api/main.go
 ```
 
+#### Frontend
+
+1. Entre na pasta do frontend:
+```bash
+cd frontend
+```
+
+2. Instale as dependências:
+```bash
+npm install
+```
+
+3. Configure as variáveis de ambiente:
+```bash
+cp .env.example .env
+# Edite o arquivo .env com suas configurações
+```
+
+4. Execute a aplicação:
+```bash
+npm start
+```
+
 ## 🏗️ Arquitetura
 
-O projeto segue uma arquitetura limpa (Clean Architecture) com as seguintes camadas:
+O projeto está organizado em uma estrutura monorepo:
 
 ```
 .
-├── cmd/
-│   └── api/            # Ponto de entrada da aplicação
-├── internal/
-│   ├── core/           # Regras de negócio e entidades
-│   │   ├── domain/     # Entidades e interfaces
-│   │   └── interfaces/ # Interfaces dos repositórios
-│   ├── handlers/       # Controladores HTTP
-│   ├── middleware/     # Middlewares (auth, logging)
-│   ├── repositories/   # Implementação dos repositórios
-│   ├── routes/         # Configuração das rotas
-│   └── services/       # Lógica de negócio
-└── tests/              # Testes de integração
+├── backend/           # API REST em Go
+│   ├── cmd/
+│   │   └── api/      # Ponto de entrada da aplicação
+│   ├── internal/
+│   │   ├── core/     # Regras de negócio e entidades
+│   │   ├── handlers/ # Controladores HTTP
+│   │   └── ...       # Outros componentes
+│   └── tests/        # Testes de integração
+├── frontend/         # Interface em React
+│   ├── src/
+│   ├── public/
+│   └── ...
+└── docker-compose.yml # Orquestração dos serviços
 ```
 
 ## 📚 Documentação da API
@@ -116,22 +152,32 @@ curl -X GET http://localhost:8080/api/v1/users/me \
 
 ## 🧪 Testes
 
-### Testes Unitários
+### Backend
+
+#### Testes Unitários
 ```bash
+cd backend
 go test ./internal/...
 ```
 
-### Testes de Integração
+#### Testes de Integração
 ```bash
+cd backend
 go test ./tests/integration/...
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm test
 ```
 
 ## 📦 Deploy
 
 ### Docker
 ```bash
-docker build -t insidechurch .
-docker run -p 8080:8080 insidechurch
+docker-compose up -d
 ```
 
 ### Kubernetes
@@ -146,10 +192,14 @@ spec:
   template:
     spec:
       containers:
-      - name: insidechurch
-        image: insidechurch:latest
+      - name: insidechurch-backend
+        image: insidechurch-backend:latest
         ports:
         - containerPort: 8080
+      - name: insidechurch-frontend
+        image: insidechurch-frontend:latest
+        ports:
+        - containerPort: 3000
 ```
 
 ## 🤝 Contribuindo

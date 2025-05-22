@@ -3,8 +3,8 @@ package repositories
 import (
 	"errors"
 
-	"insidechurch/internal/core/domain"
-	"insidechurch/internal/core/interfaces"
+	"insidechurch/backend/internal/core/domain"
+	"insidechurch/backend/internal/core/interfaces"
 
 	"gorm.io/gorm"
 )

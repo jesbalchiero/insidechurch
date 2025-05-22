@@ -1,8 +1,8 @@
 package routes
 
 import (
-	"insidechurch/internal/handlers"
-	"insidechurch/internal/middleware"
+	"insidechurch/backend/internal/handlers"
+	"insidechurch/backend/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 )

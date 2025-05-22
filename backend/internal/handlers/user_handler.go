@@ -3,9 +3,9 @@ package handlers
 import (
 	"net/http"
 
-	"insidechurch/internal/core/domain"
-	"insidechurch/internal/core/interfaces"
-	"insidechurch/internal/services"
+	"insidechurch/backend/internal/core/domain"
+	"insidechurch/backend/internal/core/interfaces"
+	"insidechurch/backend/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
