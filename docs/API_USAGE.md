@@ -306,4 +306,199 @@ curl -X POST http://localhost:8080/api/v1/webhooks \
   },
   "timestamp": "2024-02-06T12:00:00Z"
 }
+```
+
+# Documentação da API
+
+## Backend
+
+### Autenticação
+
+#### Login
+```http
+POST /api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "usuario@exemplo.com",
+  "password": "senha123"
+}
+```
+
+Resposta:
+```json
+{
+  "token": "jwt_token",
+  "user": {
+    "id": 1,
+    "name": "Usuário",
+    "email": "usuario@exemplo.com"
+  }
+}
+```
+
+#### Registro
+```http
+POST /api/v1/auth/register
+Content-Type: application/json
+
+{
+  "name": "Novo Usuário",
+  "email": "novo@exemplo.com",
+  "password": "senha123"
+}
+```
+
+Resposta:
+```json
+{
+  "token": "jwt_token",
+  "user": {
+    "id": 2,
+    "name": "Novo Usuário",
+    "email": "novo@exemplo.com"
+  }
+}
+```
+
+### Usuários
+
+#### Listar Usuários
+```http
+GET /api/v1/users
+Authorization: Bearer jwt_token
+```
+
+#### Obter Usuário
+```http
+GET /api/v1/users/:id
+Authorization: Bearer jwt_token
+```
+
+#### Atualizar Usuário
+```http
+PUT /api/v1/users/:id
+Authorization: Bearer jwt_token
+Content-Type: application/json
+
+{
+  "name": "Nome Atualizado",
+  "email": "atualizado@exemplo.com"
+}
+```
+
+#### Deletar Usuário
+```http
+DELETE /api/v1/users/:id
+Authorization: Bearer jwt_token
+```
+
+## Frontend
+
+### Fluxo de Autenticação
+
+1. **Login**
+   - Usuário acessa `/login`
+   - Preenche formulário com email e senha
+   - Frontend valida campos
+   - Envia requisição para `/api/v1/auth/login`
+   - Armazena token e dados do usuário
+   - Redireciona para dashboard
+
+2. **Registro**
+   - Usuário acessa `/register`
+   - Preenche formulário com nome, email e senha
+   - Frontend valida campos
+   - Envia requisição para `/api/v1/auth/register`
+   - Armazena token e dados do usuário
+   - Redireciona para dashboard
+
+3. **Logout**
+   - Usuário clica em logout
+   - Frontend remove token e dados do usuário
+   - Redireciona para login
+
+### Middleware de Autenticação
+
+O frontend implementa dois middlewares:
+
+1. **auth**
+   - Protege rotas que requerem autenticação
+   - Verifica token no localStorage
+   - Redireciona para login se não autenticado
+
+2. **guest**
+   - Protege rotas de visitantes
+   - Redireciona para dashboard se autenticado
+
+### Plugin de Autenticação
+
+- Executa apenas no cliente
+- Verifica token ao iniciar aplicação
+- Carrega dados do usuário se token existir
+- Remove token se inválido
+
+### Composables
+
+1. **useAuth**
+```typescript
+const { user, login, register, logout } = useAuth()
+```
+
+2. **useApi**
+```typescript
+const { get, post, put, del } = useApi()
+```
+
+### Stores
+
+1. **authStore**
+```typescript
+const { user, token, isAuthenticated } = useAuthStore()
+```
+
+2. **userStore**
+```typescript
+const { users, fetchUsers, updateUser } = useUserStore()
+```
+
+## Exemplos de Uso
+
+### Login
+```typescript
+const { login } = useAuth()
+
+try {
+  await login({
+    email: 'usuario@exemplo.com',
+    password: 'senha123'
+  })
+  // Redirecionar para dashboard
+} catch (error) {
+  // Mostrar erro
+}
+```
+
+### Listar Usuários
+```typescript
+const { users, fetchUsers } = useUserStore()
+
+onMounted(async () => {
+  await fetchUsers()
+})
+```
+
+### Atualizar Usuário
+```typescript
+const { updateUser } = useUserStore()
+
+try {
+  await updateUser(id, {
+    name: 'Novo Nome',
+    email: 'novo@email.com'
+  })
+  // Mostrar sucesso
+} catch (error) {
+  // Mostrar erro
+}
 ``` 

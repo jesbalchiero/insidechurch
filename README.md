@@ -1,32 +1,42 @@
 # InsideChurch
 
-Sistema completo para gerenciamento de igrejas e membros, desenvolvido com Go no backend e React no frontend.
+Sistema completo para gerenciamento de igrejas e membros, desenvolvido com Go no backend e Nuxt.js no frontend.
+
+## 📁 Estrutura do Projeto
+
+```
+insidechurch/
+├── backend/           # API Go
+│   ├── cmd/          # Ponto de entrada
+│   ├── internal/     # Código interno
+│   └── pkg/          # Pacotes públicos
+├── frontend/         # Interface Nuxt.js
+│   ├── components/   # Componentes Vue
+│   ├── pages/        # Páginas
+│   └── stores/       # Stores Pinia
+├── docs/             # Documentação
+└── scripts/          # Scripts úteis
+```
 
 ## 🚀 Tecnologias
 
 ### Backend
-- Go 1.21
+- Go 1.21+
 - Gin (Framework Web)
 - GORM (ORM)
 - PostgreSQL
 - JWT (Autenticação)
 - Docker
-- Swagger (Documentação da API)
 
 ### Frontend
-- React
+- Nuxt 3
+- Vue 3
 - TypeScript
-- Material-UI
-- Docker
+- Tailwind CSS
+- Pinia
+- Vue Test Utils
 
-## 📋 Pré-requisitos
-
-- Go 1.21 ou superior
-- Node.js 18 ou superior
-- PostgreSQL 15
-- Docker e Docker Compose
-
-## 🔧 Instalação
+## 🛠️ Instalação
 
 ### Usando Docker (Recomendado)
 
@@ -38,179 +48,120 @@ cd insidechurch
 
 2. Configure as variáveis de ambiente:
 ```bash
-# Backend
 cp backend/.env.example backend/.env
-# Frontend
 cp frontend/.env.example frontend/.env
-# Edite os arquivos .env com suas configurações
 ```
 
-3. Inicie os containers:
+3. Inicie os serviços:
 ```bash
-docker-compose up -d
+./scripts/docker-dev.sh
 ```
 
 ### Instalação Manual
 
 #### Backend
 
-1. Entre na pasta do backend:
+1. Instale o Go 1.21+
+2. Configure o PostgreSQL
+3. Instale dependências:
 ```bash
 cd backend
-```
-
-2. Instale as dependências:
-```bash
 go mod download
 ```
 
-3. Configure as variáveis de ambiente:
-```bash
-cp .env.example .env
-# Edite o arquivo .env com suas configurações
-```
-
-4. Execute a aplicação:
+4. Execute:
 ```bash
 go run cmd/api/main.go
 ```
 
 #### Frontend
 
-1. Entre na pasta do frontend:
+1. Instale Node.js 18+
+2. Instale dependências:
 ```bash
 cd frontend
-```
-
-2. Instale as dependências:
-```bash
 npm install
 ```
 
-3. Configure as variáveis de ambiente:
+3. Execute:
 ```bash
-cp .env.example .env
-# Edite o arquivo .env com suas configurações
-```
-
-4. Execute a aplicação:
-```bash
-npm start
+npm run dev
 ```
 
 ## 🏗️ Arquitetura
 
-O projeto está organizado em uma estrutura monorepo:
+### Backend
 
-```
-.
-├── backend/           # API REST em Go
-│   ├── cmd/
-│   │   └── api/      # Ponto de entrada da aplicação
-│   ├── internal/
-│   │   ├── core/     # Regras de negócio e entidades
-│   │   ├── handlers/ # Controladores HTTP
-│   │   └── ...       # Outros componentes
-│   └── tests/        # Testes de integração
-├── frontend/         # Interface em React
-│   ├── src/
-│   ├── public/
-│   └── ...
-└── docker-compose.yml # Orquestração dos serviços
-```
+Seguindo Clean Architecture:
 
-## 📚 Documentação da API
+- **Entities**: Regras de negócio
+- **Use Cases**: Casos de uso
+- **Interfaces**: Controllers e Repositories
+- **Frameworks**: Gin, GORM, etc.
 
-A documentação completa da API está disponível via Swagger em:
-```
-http://localhost:8080/swagger/index.html
-```
+### Frontend
 
-## 🔐 Autenticação
+Arquitetura baseada em componentes:
 
-A API usa JWT para autenticação. Para acessar rotas protegidas:
+- **Components**: Reutilizáveis e específicos
+- **Pages**: Rotas da aplicação
+- **Stores**: Gerenciamento de estado
+- **Composables**: Lógica reutilizável
 
-1. Registre um usuário:
-```bash
-curl -X POST http://localhost:8080/api/v1/users/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"usuario@exemplo.com","password":"senha123","name":"Usuário Teste"}'
-```
+## 📚 Documentação
 
-2. Faça login:
-```bash
-curl -X POST http://localhost:8080/api/v1/users/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"usuario@exemplo.com","password":"senha123"}'
-```
-
-3. Use o token retornado nas requisições:
-```bash
-curl -X GET http://localhost:8080/api/v1/users/me \
-  -H "Authorization: Bearer seu-token-jwt"
-```
+- [Uso da API](docs/API_USAGE.md)
+- [Guia de Contribuição](CONTRIBUTING.md)
+- [Checklist de Testes](docs/TESTS.md)
 
 ## 🧪 Testes
 
 ### Backend
-
-#### Testes Unitários
 ```bash
 cd backend
-go test ./internal/...
-```
-
-#### Testes de Integração
-```bash
-cd backend
-go test ./tests/integration/...
+go test ./...
 ```
 
 ### Frontend
-
 ```bash
 cd frontend
-npm test
+npm run test
+npm run test:e2e
 ```
 
-## 📦 Deploy
+## 🚢 Deploy
 
 ### Docker
+
+1. Build das imagens:
 ```bash
-docker-compose up -d
+docker-compose -f docker-compose.prod.yml build
+```
+
+2. Iniciar serviços:
+```bash
+docker-compose -f docker-compose.prod.yml up -d
 ```
 
 ### Kubernetes
-Exemplo de deployment:
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: insidechurch
-spec:
-  replicas: 3
-  template:
-    spec:
-      containers:
-      - name: insidechurch-backend
-        image: insidechurch-backend:latest
-        ports:
-        - containerPort: 8080
-      - name: insidechurch-frontend
-        image: insidechurch-frontend:latest
-        ports:
-        - containerPort: 3000
+
+1. Aplique os manifests:
+```bash
+kubectl apply -f k8s/
 ```
 
-## 🤝 Contribuindo
+2. Verifique o status:
+```bash
+kubectl get pods
+```
 
-1. Fork o projeto
-2. Crie sua branch (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
+## 📫 Suporte
 
-## 📝 Licença
+- Abra uma issue para bugs
+- Use discussions para ideias
+- Entre em contato com mantenedores
+
+## 📄 Licença
 
 Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
 
