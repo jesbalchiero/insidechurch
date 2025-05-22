@@ -60,6 +60,41 @@ export const useAuth = () => {
     }
   }
 
+  const getUser = async () => {
+    try {
+      loading.value = true
+      const token = localStorage.getItem('token')
+      
+      if (!token) {
+        throw new Error('Token não encontrado')
+      }
+
+      const response = await fetch('/api/auth/user', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('token')
+          router.push('/login')
+        }
+        const error = await response.json()
+        throw new Error(error.message || 'Erro ao carregar usuário')
+      }
+
+      const data = await response.json()
+      user.value = data
+      return data
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao carregar usuário')
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
   const logout = () => {
     user.value = null
     localStorage.removeItem('token')
@@ -71,6 +106,7 @@ export const useAuth = () => {
     loading,
     login,
     register,
+    getUser,
     logout
   }
 } 
