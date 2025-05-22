@@ -1,10 +1,12 @@
 import type { NitroFetchOptions } from 'nitropack'
 import { useAuthStore } from '~/stores/auth'
+import { useToast } from 'vue-toastification'
 
 export const useApi = () => {
   const config = useRuntimeConfig()
   const router = useRouter()
   const auth = useAuthStore()
+  const toast = useToast()
 
   const baseFetch = $fetch.create({
     baseURL: config.public.apiBase as string,
@@ -12,6 +14,13 @@ export const useApi = () => {
       'Content-Type': 'application/json',
     },
   })
+
+  const handleError = (error: any) => {
+    if (error.response?.status === 500) {
+      toast.error('Ocorreu um erro interno. Por favor, tente novamente mais tarde.')
+    }
+    throw error
+  }
 
   const fetchWithAuth = async <T>(
     url: string,
@@ -36,7 +45,7 @@ export const useApi = () => {
         auth.clearAuth()
         router.push('/login')
       }
-      throw error
+      return handleError(error)
     }
   }
 

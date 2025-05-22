@@ -161,9 +161,11 @@
 <script setup lang="ts">
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/vue'
 import { useAuth } from '~/composables/useAuth'
+import { useToast } from 'vue-toastification'
 
 const auth = useAuth()
 const isOpen = ref(false)
+const toast = useToast()
 
 const userInitials = computed(() => {
   if (!auth.user.value?.name) return ''
@@ -176,6 +178,7 @@ const userInitials = computed(() => {
 
 const handleLogout = () => {
   auth.logout()
+  toast.success('Até logo!')
   isOpen.value = false
 }
 </script> 

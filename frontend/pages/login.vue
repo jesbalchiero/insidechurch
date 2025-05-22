@@ -10,6 +10,30 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
+import { useAuth } from '../composables/useAuth'
+import { useRouter } from 'vue-router'
+import { useToast } from 'vue-toastification'
+
+const auth = useAuth()
+const router = useRouter()
+const toast = useToast()
+
+const form = ref({
+  email: '',
+  password: ''
+})
+
+const handleSubmit = async () => {
+  try {
+    await auth.login(form.value)
+    toast.success('Login realizado com sucesso!')
+    router.push('/dashboard')
+  } catch (error: any) {
+    toast.error(error.response?._data?.message || 'Erro ao fazer login')
+  }
+}
+
 definePageMeta({
   layout: 'auth',
   middleware: ['guest']
