@@ -1,11 +1,10 @@
 // Interface para o modelo de usuário
 export interface User {
-  id: number;
-  email: string;
+  id: string;
   name: string;
-  created_at: string;
-  updated_at: string; 
-  deleted_at: string | null; 
+  email: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Interfaces para requests
@@ -15,19 +14,15 @@ export interface LoginRequest {
 }
 
 export interface RegisterRequest {
+  name: string;
   email: string;
   password: string;
-  name: string;
 }
 
 // Interface para response de autenticação
 export interface AuthResponse {
   token: string;
-  user: {
-    id: number;
-    email: string;
-    name: string;
-  };
+  user: User;
 }
 
 // Interface para erros da API

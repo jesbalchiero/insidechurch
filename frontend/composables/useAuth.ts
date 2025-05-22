@@ -1,69 +1,76 @@
-import type { User, LoginRequest, RegisterRequest } from '~/types'
-import { useApi } from './useApi'
-import { useToast } from './useToast'
-import { useAuthStore } from '~/stores/auth'
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useToast } from 'vue-toastification'
+import type { LoginRequest, RegisterRequest, User } from '~/types'
 
 export const useAuth = () => {
-  const api = useApi()
+  const router = useRouter()
   const toast = useToast()
-  const auth = useAuthStore()
+  const user = ref<User | null>(null)
+  const loading = ref(false)
 
-  const login = async (email: string, password: string) => {
+  const login = async (credentials: LoginRequest) => {
     try {
-      const response = await api.fetch<{ token: string; user: User }>('/api/login', {
+      loading.value = true
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
-        body: { email, password } as LoginRequest,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials)
       })
 
-      auth.setAuth(response)
-      toast.success('Login realizado com sucesso!')
-      return response
-    } catch (error: any) {
-      toast.error(error.data?.message || 'Erro ao fazer login')
-      throw error
-    }
-  }
-
-  const register = async (email: string, password: string, name: string) => {
-    try {
-      const response = await api.fetch<{ token: string; user: User }>('/api/register', {
-        method: 'POST',
-        body: { email, password, name } as RegisterRequest,
-      })
-
-      auth.setAuth(response)
-      toast.success('Cadastro realizado com sucesso!')
-      return response
-    } catch (error: any) {
-      toast.error(error.data?.message || 'Erro ao fazer cadastro')
-      throw error
-    }
-  }
-
-  const getUser = async () => {
-    try {
-      const response = await api.fetch<User>('/api/user')
-      auth.setUser(response)
-      return response
-    } catch (error: any) {
-      if (error.statusCode === 401) {
-        auth.clearAuth()
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Erro ao fazer login')
       }
+
+      const data = await response.json()
+      user.value = data.user
+      localStorage.setItem('token', data.token)
+      toast.success('Login realizado com sucesso!')
+      router.push('/dashboard')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao fazer login')
       throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const register = async (data: RegisterRequest) => {
+    try {
+      loading.value = true
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Erro ao cadastrar')
+      }
+
+      toast.success('Cadastro realizado com sucesso!')
+      router.push('/login')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao cadastrar')
+      throw error
+    } finally {
+      loading.value = false
     }
   }
 
   const logout = () => {
-    auth.clearAuth()
-    toast.info('Logout realizado com sucesso!')
+    user.value = null
+    localStorage.removeItem('token')
+    router.push('/login')
   }
 
   return {
-    user: auth.user,
-    isAuthenticated: auth.isAuthenticated,
+    user,
+    loading,
     login,
     register,
-    getUser,
-    logout,
+    logout
   }
 } 
