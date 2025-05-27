@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20.11.1-alpine3.19-slim AS builder
+FROM node:20-alpine AS builder
 
 # Add non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
@@ -19,7 +19,7 @@ COPY . .
 RUN yarn build
 
 # Production stage
-FROM node:20.11.1-alpine3.19-slim
+FROM node:20-alpine
 
 # Add non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup

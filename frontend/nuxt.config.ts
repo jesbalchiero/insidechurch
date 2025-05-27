@@ -10,12 +10,11 @@ export default defineNuxtConfig({
     'vue-toastification/dist/index.css',
     '@/assets/css/main.css'
   ],
-  postcss: {
-    plugins: {
-      '@tailwindcss/forms': {},
-      tailwindcss: {},
-      autoprefixer: {},
-    },
+  tailwindcss: {
+    cssPath: '~/assets/css/main.css',
+    configPath: 'tailwind.config.js',
+    exposeConfig: false,
+    viewer: true,
   },
   app: {
     head: {

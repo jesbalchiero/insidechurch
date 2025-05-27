@@ -15,7 +15,7 @@ RUN go mod download
 COPY . .
 
 # Compilar a aplicação com flags de segurança
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o main .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o main ./cmd/api
 
 # Final stage
 FROM alpine:3.19
