@@ -4,8 +4,13 @@ export default defineNuxtConfig({
   modules: [
     '@nuxtjs/tailwindcss',
     '@pinia/nuxt',
-    '@pinia-plugin-persistedstate/nuxt',
   ],
+  pinia: {
+    storesDirs: ['./stores/**'],
+  },
+  imports: {
+    dirs: ['stores'],
+  },
   css: [
     'vue-toastification/dist/index.css',
     '@/assets/css/main.css'

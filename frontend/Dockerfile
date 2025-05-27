@@ -15,8 +15,10 @@ RUN yarn install --frozen-lockfile --production=false
 # Copy project files
 COPY . .
 
-# Build the application
-RUN yarn build
+# Clean cache and build the application
+RUN rm -rf .nuxt node_modules/.vite && \
+    yarn install --frozen-lockfile && \
+    yarn build
 
 # Production stage
 FROM node:20-alpine

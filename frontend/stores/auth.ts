@@ -11,9 +11,8 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = response.token
     user.value = {
       ...response.user,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      deleted_at: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     }
     
     // Salvar token no cookie
@@ -45,6 +44,4 @@ export const useAuthStore = defineStore('auth', () => {
     setUser,
     clearAuth,
   }
-}, {
-  persist: true,
 }) 
