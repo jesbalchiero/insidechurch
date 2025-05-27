@@ -29,13 +29,15 @@ RUN adduser -D -g '' appuser
 RUN apk add --no-cache ca-certificates tzdata && \
     update-ca-certificates
 
-# Copiar binário e configurações
+# Copiar binário, configurações e documentação
 COPY --from=builder /app/main .
 COPY --from=builder /app/.env .
+COPY --from=builder /app/cmd/api/docs/* ./swagger/
 
 # Configurar permissões
 RUN chown -R appuser:appuser /app && \
-    chmod -R 755 /app
+    chmod -R 755 /app && \
+    chmod -R 644 /app/swagger/*
 
 USER appuser
 

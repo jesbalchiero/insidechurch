@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 
+	_ "insidechurch/backend/cmd/api/docs" // Importar a documentação do Swagger
 	"insidechurch/backend/internal/handlers"
 	"insidechurch/backend/internal/middleware"
 	"insidechurch/backend/internal/repositories"
@@ -12,12 +13,29 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/sirupsen/logrus"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
+// @title           Inside Church API
+// @version         1.0
+// @description     API para o sistema Inside Church
+// @termsOfService  http://swagger.io/terms/
+
+// @contact.name   API Support
+// @contact.url    http://www.swagger.io/support
+// @contact.email  support@swagger.io
+
+// @license.name  Apache 2.0
+// @license.url   http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host      localhost:8080
+// @BasePath  /api
+
+// @securityDefinitions.apikey Bearer
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
 func main() {
 	// Carregar variáveis de ambiente
 	if err := godotenv.Load(); err != nil {
@@ -45,15 +63,8 @@ func main() {
 	// Configuração do router
 	router := gin.Default()
 
-	// Aplicar middlewares de segurança
-	router.Use(securityMiddleware.SecurityHeaders())
-	router.Use(securityMiddleware.RateLimit())
-	router.Use(securityMiddleware.CORS())
-
 	// Configuração das rotas
-	routes.SetupRoutes(router, userHandler, authMiddleware)
-
-	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	routes.SetupRoutes(router, userHandler, authMiddleware, securityMiddleware)
 
 	// Porta do servidor
 	port := os.Getenv("PORT")

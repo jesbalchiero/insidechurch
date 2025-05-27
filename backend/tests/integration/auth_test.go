@@ -41,10 +41,11 @@ func setupRouter(db *gorm.DB) *gin.Engine {
 	authService := services.NewAuthService(userRepo)
 	userHandler := handlers.NewUserHandler(userRepo, authService)
 	authMiddleware := middleware.NewAuthMiddleware(authService)
+	securityMiddleware := middleware.NewSecurityMiddleware()
 
 	// Configurar router
 	router := gin.Default()
-	routes.SetupRoutes(router, userHandler, authMiddleware)
+	routes.SetupRoutes(router, userHandler, authMiddleware, securityMiddleware)
 
 	return router
 }
