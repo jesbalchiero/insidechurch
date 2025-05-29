@@ -20,6 +20,7 @@ func SetupRoutes(
 	router.Use(securityMiddleware.SecurityHeaders())
 	router.Use(securityMiddleware.RateLimit())
 	router.Use(securityMiddleware.CORS())
+	router.Use(middleware.ErrorHandler())
 
 	// Rota raiz
 	router.GET("/", func(c *gin.Context) {
