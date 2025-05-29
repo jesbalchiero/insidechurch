@@ -1,29 +1,24 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from './useToast'
+import { useApi } from './useApi'
 import type { LoginRequest, RegisterRequest, User } from '~/types'
 
 export const useAuth = () => {
   const router = useRouter()
   const toast = useToast()
+  const api = useApi()
   const user = ref<User | null>(null)
   const loading = ref(false)
 
   const login = async (credentials: LoginRequest) => {
     try {
       loading.value = true
-      const response = await fetch('/api/auth/login', {
+      const data = await api.fetch<{ user: User; token: string }>('/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(credentials)
+        body: credentials
       })
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Erro ao fazer login')
-      }
-
-      const data = await response.json()
       user.value = data.user
       if (process.client) {
         localStorage.setItem('token', data.token)
@@ -41,16 +36,10 @@ export const useAuth = () => {
   const register = async (data: RegisterRequest) => {
     try {
       loading.value = true
-      const response = await fetch('/api/auth/register', {
+      await api.fetch('/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: data
       })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Erro ao cadastrar')
-      }
 
       toast.success('Cadastro realizado com sucesso!')
       router.push('/login')
@@ -74,27 +63,16 @@ export const useAuth = () => {
         throw new Error('Token não encontrado')
       }
 
-      const response = await fetch('/api/auth/user', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          if (process.client) {
-            localStorage.removeItem('token')
-          }
-          router.push('/login')
-        }
-        const error = await response.json()
-        throw new Error(error.message || 'Erro ao carregar usuário')
-      }
-
-      const data = await response.json()
+      const data = await api.fetch<User>('/user')
       user.value = data
       return data
-    } catch (error) {
+    } catch (error: any) {
+      if (error.statusCode === 401) {
+        if (process.client) {
+          localStorage.removeItem('token')
+        }
+        router.push('/login')
+      }
       toast.error(error instanceof Error ? error.message : 'Erro ao carregar usuário')
       throw error
     } finally {
