@@ -379,16 +379,23 @@ func main() {
 		os.Setenv("JWT_SECRET", "sua_chave_secreta_aqui")
 	}
 
-	// Rotas públicas com rate limiting
-	http.HandleFunc("/auth/register", rateLimitMiddleware(registerHandler))
-	http.HandleFunc("/auth/login", rateLimitMiddleware(loginHandler))
-	http.HandleFunc("/auth/refresh", rateLimitMiddleware(refreshHandler))
+	// Inicializar o logger de auditoria
+	if err := initAuditLogger(); err != nil {
+		fmt.Printf("Erro ao inicializar logger de auditoria: %v\n", err)
+		os.Exit(1)
+	}
+	defer auditLogger.Close()
+
+	// Rotas públicas com rate limiting e auditoria
+	http.HandleFunc("/auth/register", auditMiddleware(rateLimitMiddleware(registerHandler)))
+	http.HandleFunc("/auth/login", auditMiddleware(rateLimitMiddleware(loginHandler)))
+	http.HandleFunc("/auth/refresh", auditMiddleware(rateLimitMiddleware(refreshHandler)))
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "ok")
 	})
 
-	// Rotas protegidas com rate limiting e autenticação
-	http.HandleFunc("/auth/validate", rateLimitMiddleware(authMiddleware(validateHandler)))
+	// Rotas protegidas com rate limiting, autenticação e auditoria
+	http.HandleFunc("/auth/validate", auditMiddleware(rateLimitMiddleware(authMiddleware(validateHandler))))
 
 	fmt.Println("Auth Service rodando na porta 8081")
 	http.ListenAndServe(":8081", nil)
