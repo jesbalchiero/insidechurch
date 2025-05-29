@@ -415,7 +415,7 @@ func refreshHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		metrics.TokenValidations.WithLabelValues("valid").Inc()
-		metrics.TokenRefreshes.Inc()
+		metrics.TokenRefreshes.WithLabelValues("success").Inc()
 		metrics.TokenGenerations.WithLabelValues("access").Inc()
 		metrics.TokenGenerations.WithLabelValues("refresh").Inc()
 
