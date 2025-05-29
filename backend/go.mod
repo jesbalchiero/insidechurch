@@ -6,7 +6,7 @@ toolchain go1.24.2
 
 require (
 	github.com/gin-gonic/gin v1.10.1
-	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/joho/godotenv v1.5.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
@@ -16,7 +16,6 @@ require (
 	golang.org/x/crypto v0.38.0
 	golang.org/x/time v0.11.0
 	gorm.io/driver/postgres v1.5.11
-	gorm.io/driver/sqlite v1.5.5
 	gorm.io/gorm v1.25.10
 )
 

@@ -12,6 +12,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+var (
+	ErrInvalidCredentials = errors.New("credenciais inválidas")
+	ErrInvalidInput       = errors.New("entrada inválida")
+)
+
 // LoginUseCase implementa o caso de uso de login
 type LoginUseCase struct {
 	userRepo ports.UserRepository
@@ -26,19 +31,24 @@ func NewLoginUseCase(userRepo ports.UserRepository) *LoginUseCase {
 
 // Login executa o caso de uso de login
 func (uc *LoginUseCase) Login(input LoginInput) (*LoginOutput, error) {
+	// Validação de entrada
+	if input.Email == "" || input.Password == "" {
+		return nil, ErrInvalidInput
+	}
+
 	// Buscar usuário pelo email
 	user, err := uc.userRepo.FindByEmail(input.Email)
 	if err != nil {
-		return nil, errors.New("credenciais inválidas")
+		return nil, ErrInvalidCredentials
 	}
 
 	if user == nil {
-		return nil, errors.New("usuário não encontrado")
+		return nil, ErrInvalidCredentials
 	}
 
 	// Verificar senha
-	if !uc.checkPasswordHash(input.Password, user.Password) {
-		return nil, errors.New("credenciais inválidas")
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
+		return nil, ErrInvalidCredentials
 	}
 
 	// Gerar token JWT
@@ -54,7 +64,7 @@ func (uc *LoginUseCase) Login(input LoginInput) (*LoginOutput, error) {
 }
 
 // ValidateToken valida um token JWT
-func (uc *LoginUseCase) ValidateToken(tokenString string) (jwt.MapClaims, error) {
+func (uc *LoginUseCase) ValidateToken(tokenString string) (*jwt.Token, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("método de assinatura inválido")
@@ -66,21 +76,16 @@ func (uc *LoginUseCase) ValidateToken(tokenString string) (jwt.MapClaims, error)
 		return nil, err
 	}
 
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		return claims, nil
+	if !token.Valid {
+		return nil, errors.New("token inválido")
 	}
 
-	return nil, errors.New("token inválido")
-}
-
-// checkPasswordHash verifica se a senha corresponde ao hash
-func (uc *LoginUseCase) checkPasswordHash(password, hash string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-	return err == nil
+	return token, nil
 }
 
 // generateToken gera um token JWT para o usuário
 func (uc *LoginUseCase) generateToken(user *entities.User) (string, error) {
+	// Criar claims do token
 	claims := jwt.MapClaims{
 		"sub":   user.ID,
 		"email": user.Email,
@@ -89,6 +94,14 @@ func (uc *LoginUseCase) generateToken(user *entities.User) (string, error) {
 		"iat":   time.Now().Unix(),
 	}
 
+	// Criar token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(os.Getenv("JWT_SECRET")))
+
+	// Assinar token
+	tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
 }
