@@ -8,45 +8,41 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - backend
+      - auth-service
+      - user-service
+      - event-service
+      - notification-service
       - frontend
     networks:
       - insidechurch-network
 
-  backend:
-    container_name: backend
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-      target: builder
-    ports:
-      - "8080:8080"
-    environment:
-      - DB_HOST=postgres
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - DB_NAME=insidechurch
-      - DB_PORT=5432
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - JWT_SECRET=your-secret-key
-      - GIN_MODE=debug
-    volumes:
-      - ./backend:/app
-      - backend_cache:/go/pkg/mod
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+  auth-service:
+    build: ./backend/auth-service
     networks:
       - insidechurch-network
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
-      interval: 5s
-      timeout: 3s
-      retries: 3
-      start_period: 5s
+    expose:
+      - "8080"
+
+  user-service:
+    build: ./backend/user-service
+    networks:
+      - insidechurch-network
+    expose:
+      - "8080"
+
+  event-service:
+    build: ./backend/event-service
+    networks:
+      - insidechurch-network
+    expose:
+      - "8080"
+
+  notification-service:
+    build: ./backend/notification-service
+    networks:
+      - insidechurch-network
+    expose:
+      - "8080"
 
   frontend:
     container_name: frontend

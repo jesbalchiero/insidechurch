@@ -1,54 +1,34 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from './useToast'
 import { useApi } from './useApi'
 import type { LoginRequest, RegisterRequest, User } from '~/types'
+import { useAuthStore } from '~/stores/auth'
 
 export const useAuth = () => {
   const router = useRouter()
   const toast = useToast()
   const api = useApi()
+  const authStore = useAuthStore()
   const user = ref<User | null>(null)
   const loading = ref(false)
 
-  const login = async (credentials: LoginRequest) => {
-    try {
-      loading.value = true
-      const data = await api.fetch<{ user: User; token: string }>('/auth/login', {
-        method: 'POST',
-        body: credentials
-      })
+  const isAuthenticated = computed(() => !!authStore.token)
 
-      user.value = data.user
-      if (process.client) {
-        localStorage.setItem('token', data.token)
-      }
-      toast.success('Login realizado com sucesso!')
-      router.push('/dashboard')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Erro ao fazer login')
-      throw error
-    } finally {
-      loading.value = false
-    }
+  const login = async (email: string, password: string) => {
+    await authStore.login(email, password)
   }
 
-  const register = async (data: RegisterRequest) => {
-    try {
-      loading.value = true
-      await api.fetch('/auth/register', {
-        method: 'POST',
-        body: data
-      })
+  const register = async (email: string, password: string) => {
+    await authStore.register(email, password)
+  }
 
-      toast.success('Cadastro realizado com sucesso!')
-      router.push('/login')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Erro ao cadastrar')
-      throw error
-    } finally {
-      loading.value = false
-    }
+  const logout = () => {
+    authStore.logout()
+  }
+
+  const refreshToken = async () => {
+    await authStore.refreshAccessToken()
   }
 
   const getUser = async () => {
@@ -80,20 +60,14 @@ export const useAuth = () => {
     }
   }
 
-  const logout = () => {
-    user.value = null
-    if (process.client) {
-      localStorage.removeItem('token')
-    }
-    router.push('/login')
-  }
-
   return {
     user,
     loading,
+    isAuthenticated,
     login,
     register,
     getUser,
-    logout
+    logout,
+    refreshToken,
   }
 } 

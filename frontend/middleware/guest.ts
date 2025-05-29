@@ -1,26 +1,9 @@
-import { useAuth } from '~/composables/useAuth'
+import { useAuthStore } from '~/stores/auth'
 
 export default defineNuxtRouteMiddleware((to) => {
-  const auth = useAuth()
-  let token = null
-  
-  if (process.client) {
-    token = localStorage.getItem('token')
-  }
+  const authStore = useAuthStore()
 
-  if (token) {
-    // Se tiver token mas não tiver usuário, tenta carregar
-    if (!auth.user.value) {
-      try {
-        auth.getUser()
-        return navigateTo('/dashboard')
-      } catch (error) {
-        // Se der erro, limpa autenticação e permite acesso
-        auth.logout()
-      }
-    } else {
-      // Se já tiver usuário carregado, redireciona
-      return navigateTo('/dashboard')
-    }
+  if (authStore.token) {
+    return navigateTo('/dashboard')
   }
 }) 

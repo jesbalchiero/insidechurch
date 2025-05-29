@@ -14,6 +14,7 @@ declare module '#app' {
         }
       }
     }
+    $fetch: typeof $fetch
   }
 
   interface RuntimeConfig {
@@ -24,5 +25,20 @@ declare module '#app' {
 
   export function defineNuxtPlugin(plugin: (nuxtApp: NuxtApp) => any): any
   export function useRuntimeConfig(): RuntimeConfig
+  export function clearError(options?: { redirect?: string }): void
   export type { NuxtApp, RuntimeConfig }
-} 
+}
+
+declare module '@vue/runtime-core' {
+  interface ComponentCustomProperties {
+    $fetch: typeof $fetch
+  }
+}
+
+declare module 'vue' {
+  interface ComponentCustomProperties {
+    $fetch: typeof $fetch
+  }
+}
+
+export {} 

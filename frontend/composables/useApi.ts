@@ -1,55 +1,39 @@
-import type { NitroFetchOptions } from 'nitropack'
+import { useRuntimeConfig } from 'nuxt/app'
 import { useAuthStore } from '~/stores/auth'
-import { useToast } from './useToast'
 
 export const useApi = () => {
   const config = useRuntimeConfig()
-  const router = useRouter()
-  const auth = useAuthStore()
-  const toast = useToast()
+  const authStore = useAuthStore()
 
-  const baseFetch = $fetch.create({
-    baseURL: config.public.apiBase as string,
-    headers: {
+  const fetch = async <T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<T> => {
+    const url = `${config.public.apiBase}${endpoint}`
+
+    const headers = new Headers({
       'Content-Type': 'application/json',
-    },
-  })
+      ...(options.headers as Record<string, string>),
+    })
 
-  const handleError = (error: any) => {
-    if (error.response?.status === 500) {
-      toast.error('Ocorreu um erro interno. Por favor, tente novamente mais tarde.')
-    }
-    throw error
-  }
-
-  const fetchWithAuth = async <T>(
-    url: string,
-    options: {
-      method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
-      body?: any
-      headers?: Record<string, string>
-    } = {}
-  ) => {
-    const headers: Record<string, string> = {
-      ...(options.headers || {}),
-      ...(auth.token ? { Authorization: `Bearer ${auth.token}` } : {}),
+    if (authStore.token) {
+      headers.set('Authorization', `Bearer ${authStore.token}`)
     }
 
-    try {
-      return await baseFetch<T>(url, {
-        ...options,
-        headers,
-      })
-    } catch (error: any) {
-      if (error.statusCode === 401) {
-        auth.clearAuth()
-        router.push('/login')
-      }
-      return handleError(error)
+    const response = await globalThis.fetch(url, {
+      ...options,
+      headers,
+    })
+
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(error)
     }
+
+    return response.json()
   }
 
   return {
-    fetch: fetchWithAuth,
+    fetch,
   }
 } 

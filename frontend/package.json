@@ -1,5 +1,5 @@
 {
-  "name": "insidechurch-frontend",
+  "name": "inside-church-frontend",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,7 +7,10 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "@headlessui/vue": "^1.7.19",
@@ -18,16 +21,19 @@
     "@vee-validate/zod": "^4.12.5",
     "@vueuse/motion": "^2.0.0",
     "dayjs": "^1.11.10",
-    "nuxt": "^3.10.3",
+    "nuxt": "^3.10.1",
     "pinia": "^2.1.7",
     "vee-validate": "^4.12.5",
     "vue-toastification": "^2.0.0-rc.5",
-    "zod": "^3.22.4"
+    "zod": "^3.22.4",
+    "vue": "^3.4.15",
+    "vue-router": "^4.2.5"
   },
   "devDependencies": {
     "@nuxt/schema": "^3.10.3",
     "@nuxt/types": "^2.17.3",
-    "@nuxtjs/tailwindcss": "^6.11.4",
+    "@nuxtjs/eslint-config-typescript": "^12.1.0",
+    "@nuxtjs/tailwindcss": "^6.11.3",
     "@tailwindcss/aspect-ratio": "^0.4.2",
     "@tailwindcss/forms": "^0.5.10",
     "@tailwindcss/typography": "^0.5.16",

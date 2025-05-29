@@ -1,47 +1,161 @@
 import { defineStore } from 'pinia'
-import type { User, AuthResponse } from '~/types'
+import { ref } from 'vue'
+
+interface User {
+  id: string
+  email: string
+}
+
+interface LoginResponse {
+  token: string
+  refreshToken: string
+}
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const token = ref<string | null>(null)
+  const refreshToken = ref<string | null>(null)
 
-  const isAuthenticated = computed(() => !!token.value)
+  const register = async (email: string, password: string) => {
+    try {
+      const response = await fetch('http://localhost:8081/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      })
 
-  function setAuth(response: AuthResponse) {
-    token.value = response.token
-    user.value = {
-      ...response.user,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      if (!response.ok) {
+        const error = await response.text()
+        throw new Error(error)
+      }
+
+      const data: LoginResponse = await response.json()
+      token.value = data.token
+      refreshToken.value = data.refreshToken
+
+      // Decodificar o token para obter informações do usuário
+      const payload = JSON.parse(atob(data.token.split('.')[1]))
+      user.value = {
+        id: payload.user_id,
+        email: email,
+      }
+
+      // Salvar no localStorage
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('refreshToken', data.refreshToken)
+    } catch (error) {
+      console.error('Erro ao registrar:', error)
+      throw error
     }
-    
-    // Salvar token no cookie
-    const cookie = useCookie('auth-token', {
-      maxAge: 60 * 60 * 24 * 7, // 7 dias
-      path: '/',
-    })
-    cookie.value = response.token
   }
 
-  function setUser(newUser: User) {
-    user.value = newUser
+  const login = async (email: string, password: string) => {
+    try {
+      const response = await fetch('http://localhost:8081/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      })
+
+      if (!response.ok) {
+        const error = await response.text()
+        throw new Error(error)
+      }
+
+      const data: LoginResponse = await response.json()
+      token.value = data.token
+      refreshToken.value = data.refreshToken
+
+      // Decodificar o token para obter informações do usuário
+      const payload = JSON.parse(atob(data.token.split('.')[1]))
+      user.value = {
+        id: payload.user_id,
+        email: email,
+      }
+
+      // Salvar no localStorage
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('refreshToken', data.refreshToken)
+    } catch (error) {
+      console.error('Erro ao fazer login:', error)
+      throw error
+    }
   }
 
-  function clearAuth() {
-    token.value = null
+  const logout = () => {
     user.value = null
-    
-    // Limpar cookie
-    const cookie = useCookie('auth-token')
-    cookie.value = null
+    token.value = null
+    refreshToken.value = null
+    localStorage.removeItem('token')
+    localStorage.removeItem('refreshToken')
+  }
+
+  const refreshAccessToken = async () => {
+    if (!refreshToken.value) {
+      throw new Error('Refresh token não disponível')
+    }
+
+    try {
+      const response = await fetch('http://localhost:8081/auth/refresh', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh_token: refreshToken.value }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao atualizar token')
+      }
+
+      const data: LoginResponse = await response.json()
+      token.value = data.token
+      refreshToken.value = data.refreshToken
+
+      // Atualizar no localStorage
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('refreshToken', data.refreshToken)
+    } catch (error) {
+      console.error('Erro ao atualizar token:', error)
+      logout()
+      throw error
+    }
+  }
+
+  const initialize = () => {
+    const storedToken = localStorage.getItem('token')
+    const storedRefreshToken = localStorage.getItem('refreshToken')
+
+    if (storedToken && storedRefreshToken) {
+      token.value = storedToken
+      refreshToken.value = storedRefreshToken
+
+      // Decodificar o token para obter informações do usuário
+      try {
+        const payload = JSON.parse(atob(storedToken.split('.')[1]))
+        user.value = {
+          id: payload.user_id,
+          email: payload.email,
+        }
+      } catch (error) {
+        console.error('Erro ao decodificar token:', error)
+        logout()
+      }
+    }
   }
 
   return {
     user,
     token,
-    isAuthenticated,
-    setAuth,
-    setUser,
-    clearAuth,
+    refreshToken,
+    register,
+    login,
+    logout,
+    refreshAccessToken,
+    initialize,
   }
 }) 

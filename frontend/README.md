@@ -1,191 +1,93 @@
-# Frontend - InsideChurch
+# Inside Church Frontend
 
-Interface do usuário desenvolvida com Nuxt 3, Vue 3 e TypeScript.
+Frontend da aplicação Inside Church, desenvolvido com Nuxt 3, TypeScript, Tailwind CSS e Pinia.
 
-## 🚀 Stack Tecnológica
+## Requisitos
 
-- **Framework**: Nuxt 3
-- **UI**: Vue 3 + Composition API
-- **Estilização**: Tailwind CSS
-- **Estado**: Pinia
-- **Tipagem**: TypeScript
-- **Testes**: Vitest + Vue Test Utils
-- **E2E**: Cypress
-- **Linting**: ESLint + Prettier
-- **Notificações**: Vue Toastification
+- Node.js 18.x ou superior
+- npm 9.x ou superior
 
-## 📁 Estrutura de Pastas
+## Instalação
+
+1. Clone o repositório
+2. Instale as dependências:
+
+```bash
+npm install
+```
+
+3. Copie o arquivo de ambiente:
+
+```bash
+cp .env.example .env
+```
+
+4. Configure as variáveis de ambiente no arquivo `.env`
+
+## Desenvolvimento
+
+Para iniciar o servidor de desenvolvimento:
+
+```bash
+npm run dev
+```
+
+O servidor estará disponível em `http://localhost:3000`.
+
+## Build
+
+Para gerar a versão de produção:
+
+```bash
+npm run build
+```
+
+Para visualizar a versão de produção:
+
+```bash
+npm run preview
+```
+
+## Linting e Formatação
+
+Para verificar o código:
+
+```bash
+npm run lint
+```
+
+Para corrigir problemas de linting:
+
+```bash
+npm run lint:fix
+```
+
+Para formatar o código:
+
+```bash
+npm run format
+```
+
+## Estrutura do Projeto
 
 ```
 frontend/
-├── components/        # Componentes Vue
-│   ├── common/       # Componentes base reutilizáveis
-│   └── features/     # Componentes específicos de features
-├── composables/      # Lógica reutilizável
-├── layouts/          # Layouts da aplicação
-├── middleware/       # Middleware de rotas
-├── pages/           # Páginas da aplicação
-├── plugins/         # Plugins Vue
-├── public/          # Arquivos estáticos
-├── stores/          # Stores Pinia
-├── types/           # Definições TypeScript
-└── utils/           # Funções utilitárias
+├── components/     # Componentes Vue reutilizáveis
+├── layouts/        # Layouts da aplicação
+├── middleware/     # Middlewares de rota
+├── pages/          # Páginas da aplicação
+├── plugins/        # Plugins Nuxt
+├── public/         # Arquivos estáticos
+├── stores/         # Stores Pinia
+└── types/          # Definições de tipos TypeScript
 ```
 
-## 🎨 Padrões de Código
+## Tecnologias Utilizadas
 
-### Componentes
-
-1. **Nomenclatura**:
-   - PascalCase para componentes
-   - kebab-case para arquivos
-   - Sufixo `.vue` para componentes
-
-2. **Estrutura**:
-```vue
-<template>
-  <!-- Template -->
-</template>
-
-<script setup lang="ts">
-// Imports
-// Props
-// Emits
-// Composables
-// Computed
-// Methods
-</script>
-
-<style scoped>
-/* Estilos */
-</style>
-```
-
-3. **Props**:
-```typescript
-const props = defineProps<{
-  title: string
-  items: Item[]
-  loading?: boolean
-}>()
-```
-
-4. **Emits**:
-```typescript
-const emit = defineEmits<{
-  (e: 'update', value: string): void
-  (e: 'delete', id: string): void
-}>()
-```
-
-### Composables
-
-1. **Nomenclatura**:
-   - Prefixo `use` (ex: `useAuth`, `useApi`)
-   - Um arquivo por composable
-
-2. **Estrutura**:
-```typescript
-export const useExample = () => {
-  // Estado
-  const state = ref()
-
-  // Métodos
-  const method = () => {}
-
-  // Retorno
-  return {
-    state,
-    method
-  }
-}
-```
-
-### Stores
-
-1. **Nomenclatura**:
-   - Sufixo `Store` (ex: `authStore`, `userStore`)
-   - Um arquivo por store
-
-2. **Estrutura**:
-```typescript
-export const useExampleStore = defineStore('example', {
-  state: () => ({}),
-  getters: {},
-  actions: {}
-})
-```
-
-## 🛠️ Como Adicionar Novos Componentes
-
-1. **Componente Base**:
-```bash
-# Criar em components/common/
-touch components/common/BaseExample.vue
-```
-
-2. **Componente de Feature**:
-```bash
-# Criar em components/features/
-touch components/features/ExampleFeature.vue
-```
-
-3. **Composable**:
-```bash
-# Criar em composables/
-touch composables/useExample.ts
-```
-
-4. **Store**:
-```bash
-# Criar em stores/
-touch stores/exampleStore.ts
-```
-
-## 📦 Scripts Disponíveis
-
-```bash
-# Desenvolvimento
-npm run dev
-
-# Build
-npm run build
-
-# Preview
-npm run preview
-
-# Lint
-npm run lint
-
-# Testes
-npm run test
-npm run test:e2e
-```
-
-## 🔧 Variáveis de Ambiente
-
-Crie um arquivo `.env` baseado no `.env.example`:
-
-```env
-NUXT_PUBLIC_API_BASE=http://localhost:8080
-```
-
-## 🧪 Testes
-
-### Unitários
-```bash
-npm run test
-```
-
-### E2E
-```bash
-npm run test:e2e
-```
-
-## 📚 Documentação Adicional
-
-- [Vue 3](https://vuejs.org/)
 - [Nuxt 3](https://nuxt.com/)
+- [TypeScript](https://www.typescriptlang.org/)
 - [Tailwind CSS](https://tailwindcss.com/)
 - [Pinia](https://pinia.vuejs.org/)
-- [TypeScript](https://www.typescriptlang.org/)
+- [Vue Router](https://router.vuejs.org/)
+- [ESLint](https://eslint.org/)
+- [Prettier](https://prettier.io/)

@@ -8,7 +8,7 @@ export default defineNuxtConfig({
     '@pinia/nuxt',
   ],
   imports: {
-    dirs: ['stores'],
+    dirs: ['stores', 'composables', 'types'],
   },
   css: [
     'vue-toastification/dist/index.css',
@@ -17,6 +17,10 @@ export default defineNuxtConfig({
   plugins: [
     '~/plugins/toast.client.ts'
   ],
+  typescript: {
+    strict: true,
+    typeCheck: true,
+  },
   app: {
     head: {
       title: 'Inside Church',
@@ -32,7 +36,7 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8080/api'
+      apiBase: process.env.API_BASE || 'http://localhost:8080'
     }
   }
 })

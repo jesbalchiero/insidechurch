@@ -1,5 +1,9 @@
 <template>
-  <div class="min-h-screen bg-base-100">
+  <div>
     <slot />
   </div>
-</template> 
+</template>
+
+<script setup lang="ts">
+// Layout padrão sem nenhuma lógica adicional
+</script> 
