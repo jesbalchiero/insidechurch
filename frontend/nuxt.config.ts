@@ -1,3 +1,5 @@
+import { defineNuxtConfig } from 'nuxt/config'
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   devtools: { enabled: true },
@@ -5,9 +7,6 @@ export default defineNuxtConfig({
     '@nuxtjs/tailwindcss',
     '@pinia/nuxt',
   ],
-  pinia: {
-    storesDirs: ['./stores/**'],
-  },
   imports: {
     dirs: ['stores'],
   },
@@ -15,12 +14,9 @@ export default defineNuxtConfig({
     'vue-toastification/dist/index.css',
     '@/assets/css/main.css'
   ],
-  tailwindcss: {
-    cssPath: '~/assets/css/main.css',
-    configPath: 'tailwind.config.js',
-    exposeConfig: false,
-    viewer: true,
-  },
+  plugins: [
+    '~/plugins/toast.client.ts'
+  ],
   app: {
     head: {
       title: 'Inside Church',
