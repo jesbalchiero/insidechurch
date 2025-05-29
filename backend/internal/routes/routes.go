@@ -48,9 +48,12 @@ func SetupRoutes(
 	public.Use(securityMiddleware.RateLimit())
 	public.Use(securityMiddleware.CORS())
 	{
-		// Rotas de autenticação
-		public.POST("/register", userHandler.Register)
-		public.POST("/login", userHandler.Login)
+		// Grupo de rotas de autenticação
+		auth := public.Group("/auth")
+		{
+			auth.POST("/register", userHandler.Register)
+			auth.POST("/login", userHandler.Login)
+		}
 	}
 
 	// Grupo de rotas protegidas
