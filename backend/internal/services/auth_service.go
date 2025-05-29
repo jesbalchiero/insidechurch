@@ -28,11 +28,6 @@ func NewAuthService(userRepo interfaces.UserRepository) *AuthService {
 	}
 }
 
-type Claims struct {
-	UserID uint
-	jwt.RegisteredClaims
-}
-
 func (s *AuthService) HashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	return string(bytes), err
@@ -44,38 +39,25 @@ func (s *AuthService) CheckPasswordHash(password, hash string) bool {
 }
 
 func (s *AuthService) GenerateToken(user *domain.User) (string, error) {
-	claims := &Claims{
-		UserID: user.ID,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			NotBefore: jwt.NewNumericDate(time.Now()),
-			Issuer:    "insidechurch",
-			Subject:   user.Email,
-		},
+	claims := jwt.MapClaims{
+		"sub":   user.ID,
+		"email": user.Email,
+		"name":  user.Name,
+		"exp":   time.Now().Add(time.Hour * 24).Unix(),
+		"iat":   time.Now().Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(s.jwtSecret)
 }
 
-func (s *AuthService) ValidateToken(tokenString string) (*Claims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+func (s *AuthService) ValidateToken(tokenString string) (*jwt.Token, error) {
+	return jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("método de assinatura inválido")
 		}
 		return s.jwtSecret, nil
 	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
-		return claims, nil
-	}
-
-	return nil, errors.New("token inválido")
 }
 
 func (s *AuthService) ValidatePassword(password string) error {

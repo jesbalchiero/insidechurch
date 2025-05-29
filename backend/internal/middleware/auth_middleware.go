@@ -7,6 +7,7 @@ import (
 	"insidechurch/backend/internal/services"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type AuthMiddleware struct {
@@ -37,15 +38,23 @@ func (m *AuthMiddleware) Authenticate() gin.HandlerFunc {
 		}
 
 		// Valida o token
-		claims, err := m.authService.ValidateToken(tokenString)
+		token, err := m.authService.ValidateToken(tokenString)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token inválido"})
 			c.Abort()
 			return
 		}
 
-		// Adiciona o ID do usuário ao contexto
-		c.Set("user_id", claims.UserID)
-		c.Next()
+		// Extrai o ID do usuário das claims
+		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+			if userID, ok := claims["sub"].(float64); ok {
+				c.Set("user_id", uint(userID))
+				c.Next()
+				return
+			}
+		}
+
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Token inválido ou mal formatado"})
+		c.Abort()
 	}
 }
