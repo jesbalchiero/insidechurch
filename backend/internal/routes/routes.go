@@ -16,6 +16,11 @@ func SetupRoutes(
 	authMiddleware *middleware.AuthMiddleware,
 	securityMiddleware *middleware.SecurityMiddleware,
 ) {
+	// Middlewares globais
+	router.Use(securityMiddleware.SecurityHeaders())
+	router.Use(securityMiddleware.RateLimit())
+	router.Use(securityMiddleware.CORS())
+
 	// Rota raiz
 	router.GET("/", func(c *gin.Context) {
 		c.Redirect(302, "/api/swagger/index.html")
@@ -29,41 +34,40 @@ func SetupRoutes(
 		})
 	})
 
-	// Grupo de rotas do Swagger
-	swagger := router.Group("/api")
-	swagger.Use(securityMiddleware.SecurityHeaders())
-	swagger.Use(securityMiddleware.RateLimit())
-	swagger.Use(securityMiddleware.CORS())
+	// Grupo de rotas da API
+	api := router.Group("/api")
 	{
-		// Servir arquivos estáticos do Swagger
-		swagger.Static("/swagger-static", "/app/swagger")
-
-		// Configuração do Swagger UI
-		url := ginSwagger.URL("/api/swagger-static/swagger.json")
-		swagger.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, url))
-	}
-
-	// Grupo de rotas públicas
-	public := router.Group("/api")
-	public.Use(securityMiddleware.SecurityHeaders())
-	public.Use(securityMiddleware.RateLimit())
-	public.Use(securityMiddleware.CORS())
-	{
-		// Grupo de rotas de autenticação
-		auth := public.Group("/auth")
+		// Grupo de rotas do Swagger
+		swagger := api.Group("/swagger")
 		{
-			auth.POST("/register", authHandler.Register)
-			auth.POST("/login", authHandler.Login)
-		}
-	}
+			// Servir arquivos estáticos do Swagger
+			swagger.Static("/static", "/app/swagger")
 
-	// Grupo de rotas protegidas
-	protected := router.Group("/api")
-	protected.Use(securityMiddleware.SecurityHeaders())
-	protected.Use(securityMiddleware.RateLimit())
-	protected.Use(securityMiddleware.CORS())
-	protected.Use(authMiddleware.Authenticate())
-	{
-		protected.GET("/user", userHandler.GetUser)
+			// Configuração do Swagger UI
+			url := ginSwagger.URL("/api/swagger/static/swagger.json")
+			swagger.GET("/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, url))
+		}
+
+		// Grupo de rotas públicas
+		public := api.Group("")
+		{
+			// Rotas de autenticação
+			auth := public.Group("/auth")
+			{
+				auth.POST("/register", authHandler.Register)
+				auth.POST("/login", authHandler.Login)
+			}
+		}
+
+		// Grupo de rotas protegidas
+		protected := api.Group("")
+		protected.Use(authMiddleware.Authenticate())
+		{
+			// Rotas de usuário
+			users := protected.Group("/users")
+			{
+				users.GET("/me", userHandler.GetUser)
+			}
+		}
 	}
 }
