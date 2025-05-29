@@ -13,7 +13,22 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/time/rate"
+
+	"github.com/insidechurch/auth-service/infrastructure/logger"
 )
+
+var (
+	log *logger.JSONLogger
+)
+
+func init() {
+	var err error
+	log, err = logger.NewJSONLogger("logs/app.log")
+	if err != nil {
+		fmt.Printf("Erro ao inicializar logger: %v\n", err)
+		os.Exit(1)
+	}
+}
 
 // Tipo personalizado para chaves do contexto
 type contextKey string
@@ -185,6 +200,11 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 
 	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Error("Erro ao decodificar requisição de registro", err,
+			logger.String("method", r.Method),
+			logger.String("path", r.URL.Path),
+			logger.String("ip", r.RemoteAddr),
+		)
 		http.Error(w, "JSON inválido", http.StatusBadRequest)
 		return
 	}
@@ -192,6 +212,10 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 	// Verificar se o email já está em uso
 	for _, u := range users {
 		if u.Email == req.Email {
+			log.Info("Tentativa de registro com email já existente",
+				logger.String("email", req.Email),
+				logger.String("ip", r.RemoteAddr),
+			)
 			http.Error(w, "Email já está em uso", http.StatusBadRequest)
 			return
 		}
@@ -200,6 +224,9 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 	// Gerar hash da senha
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
+		log.Error("Erro ao gerar hash da senha", err,
+			logger.String("email", req.Email),
+		)
 		http.Error(w, "Erro ao processar senha", http.StatusInternalServerError)
 		return
 	}
@@ -215,9 +242,17 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 	// Gerar tokens
 	tokenPair, err := generateTokenPair(newUser.ID)
 	if err != nil {
+		log.Error("Erro ao gerar tokens", err,
+			logger.String("user_id", newUser.ID),
+		)
 		http.Error(w, "Erro ao gerar tokens", http.StatusInternalServerError)
 		return
 	}
+
+	log.Info("Usuário registrado com sucesso",
+		logger.String("user_id", newUser.ID),
+		logger.String("email", newUser.Email),
+	)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tokenPair)
@@ -231,6 +266,11 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Error("Erro ao decodificar requisição de login", err,
+			logger.String("method", r.Method),
+			logger.String("path", r.URL.Path),
+			logger.String("ip", r.RemoteAddr),
+		)
 		http.Error(w, "JSON inválido", http.StatusBadRequest)
 		return
 	}
@@ -245,12 +285,20 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user == nil {
+		log.Info("Tentativa de login com email não encontrado",
+			logger.String("email", req.Email),
+			logger.String("ip", r.RemoteAddr),
+		)
 		http.Error(w, "Credenciais inválidas", http.StatusUnauthorized)
 		return
 	}
 
 	// Verificar senha
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+		log.Info("Tentativa de login com senha inválida",
+			logger.String("email", req.Email),
+			logger.String("ip", r.RemoteAddr),
+		)
 		http.Error(w, "Credenciais inválidas", http.StatusUnauthorized)
 		return
 	}
@@ -258,9 +306,17 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	// Gerar tokens
 	tokenPair, err := generateTokenPair(user.ID)
 	if err != nil {
+		log.Error("Erro ao gerar tokens", err,
+			logger.String("user_id", user.ID),
+		)
 		http.Error(w, "Erro ao gerar tokens", http.StatusInternalServerError)
 		return
 	}
+
+	log.Info("Login realizado com sucesso",
+		logger.String("user_id", user.ID),
+		logger.String("email", user.Email),
+	)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tokenPair)
@@ -381,7 +437,7 @@ func main() {
 
 	// Inicializar o logger de auditoria
 	if err := initAuditLogger(); err != nil {
-		fmt.Printf("Erro ao inicializar logger de auditoria: %v\n", err)
+		log.Error("Erro ao inicializar logger de auditoria", err)
 		os.Exit(1)
 	}
 	defer auditLogger.Close()
@@ -396,6 +452,10 @@ func main() {
 
 	// Rotas protegidas com rate limiting, autenticação e auditoria
 	http.HandleFunc("/auth/validate", auditMiddleware(rateLimitMiddleware(authMiddleware(validateHandler))))
+
+	log.Info("Serviço de autenticação iniciado",
+		logger.String("port", "8081"),
+	)
 
 	fmt.Println("Auth Service rodando na porta 8081")
 	http.ListenAndServe(":8081", nil)
