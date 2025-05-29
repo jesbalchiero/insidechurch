@@ -1,14 +1,23 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+)
+
+// Tipo personalizado para chaves do contexto
+type contextKey string
+
+const (
+	userIDKey contextKey = "user_id"
 )
 
 type User struct {
@@ -32,8 +41,14 @@ type LoginResponse struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+type TokenPair struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
 type Claims struct {
 	UserID string `json:"user_id"`
+	Type   string `json:"type"` // "access" ou "refresh"
 	jwt.RegisteredClaims
 }
 
@@ -58,30 +73,41 @@ var users = []User{
 	},
 }
 
-func generateToken(userID string) (string, error) {
-	claims := &Claims{
+func generateTokenPair(userID string) (*TokenPair, error) {
+	// Gerar access token (15 minutos)
+	accessClaims := &Claims{
 		UserID: userID,
+		Type:   "access",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
+	accessTokenString, err := accessToken.SignedString(jwtKey)
+	if err != nil {
+		return nil, err
+	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtKey)
-}
-
-func generateRefreshToken(userID string) (string, error) {
-	claims := &Claims{
+	// Gerar refresh token (7 dias)
+	refreshClaims := &Claims{
 		UserID: userID,
+		Type:   "refresh",
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
+	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
+	refreshTokenString, err := refreshToken.SignedString(jwtKey)
+	if err != nil {
+		return nil, err
+	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtKey)
+	return &TokenPair{
+		AccessToken:  accessTokenString,
+		RefreshToken: refreshTokenString,
+	}, nil
 }
 
 func registerHandler(w http.ResponseWriter, r *http.Request) {
@@ -120,25 +146,14 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 	users = append(users, newUser)
 
 	// Gerar tokens
-	token, err := generateToken(newUser.ID)
+	tokenPair, err := generateTokenPair(newUser.ID)
 	if err != nil {
-		http.Error(w, "Erro ao gerar token", http.StatusInternalServerError)
+		http.Error(w, "Erro ao gerar tokens", http.StatusInternalServerError)
 		return
-	}
-
-	refreshToken, err := generateRefreshToken(newUser.ID)
-	if err != nil {
-		http.Error(w, "Erro ao gerar refresh token", http.StatusInternalServerError)
-		return
-	}
-
-	response := LoginResponse{
-		Token:        token,
-		RefreshToken: refreshToken,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(tokenPair)
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
@@ -174,25 +189,14 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Gerar tokens
-	token, err := generateToken(user.ID)
+	tokenPair, err := generateTokenPair(user.ID)
 	if err != nil {
-		http.Error(w, "Erro ao gerar token", http.StatusInternalServerError)
+		http.Error(w, "Erro ao gerar tokens", http.StatusInternalServerError)
 		return
-	}
-
-	refreshToken, err := generateRefreshToken(user.ID)
-	if err != nil {
-		http.Error(w, "Erro ao gerar refresh token", http.StatusInternalServerError)
-		return
-	}
-
-	response := LoginResponse{
-		Token:        token,
-		RefreshToken: refreshToken,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(tokenPair)
 }
 
 func refreshHandler(w http.ResponseWriter, r *http.Request) {
@@ -201,10 +205,7 @@ func refreshHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		RefreshToken string `json:"refresh_token"`
-	}
-
+	var req RefreshRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "JSON inválido", http.StatusBadRequest)
 		return
@@ -221,20 +222,21 @@ func refreshHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Gerar novo token
-	newToken, err := generateToken(claims.UserID)
-	if err != nil {
-		http.Error(w, "Erro ao gerar token", http.StatusInternalServerError)
+	// Verificar se é um refresh token
+	if claims.Type != "refresh" {
+		http.Error(w, "Token inválido", http.StatusUnauthorized)
 		return
 	}
 
-	response := LoginResponse{
-		Token:        newToken,
-		RefreshToken: req.RefreshToken,
+	// Gerar novo par de tokens
+	tokenPair, err := generateTokenPair(claims.UserID)
+	if err != nil {
+		http.Error(w, "Erro ao gerar tokens", http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(tokenPair)
 }
 
 func validateHandler(w http.ResponseWriter, r *http.Request) {
@@ -266,19 +268,60 @@ func validateHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(claims)
 }
 
+func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, "Token não fornecido", http.StatusUnauthorized)
+			return
+		}
+
+		// Extrair o token do header "Bearer <token>"
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			http.Error(w, "Formato de token inválido", http.StatusUnauthorized)
+			return
+		}
+
+		token := parts[1]
+		claims := &Claims{}
+		parsedToken, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
+			return jwtKey, nil
+		})
+
+		if err != nil || !parsedToken.Valid {
+			http.Error(w, "Token inválido", http.StatusUnauthorized)
+			return
+		}
+
+		// Verificar se é um access token
+		if claims.Type != "access" {
+			http.Error(w, "Token inválido", http.StatusUnauthorized)
+			return
+		}
+
+		// Adicionar o ID do usuário ao contexto da requisição usando o tipo personalizado
+		ctx := context.WithValue(r.Context(), userIDKey, claims.UserID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	}
+}
+
 func main() {
 	// Definir JWT_SECRET se não estiver definido
 	if os.Getenv("JWT_SECRET") == "" {
 		os.Setenv("JWT_SECRET", "sua_chave_secreta_aqui")
 	}
 
+	// Rotas públicas
 	http.HandleFunc("/auth/register", registerHandler)
 	http.HandleFunc("/auth/login", loginHandler)
 	http.HandleFunc("/auth/refresh", refreshHandler)
-	http.HandleFunc("/auth/validate", validateHandler)
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "ok")
 	})
+
+	// Rotas protegidas
+	http.HandleFunc("/auth/validate", authMiddleware(validateHandler))
 
 	fmt.Println("Auth Service rodando na porta 8081")
 	http.ListenAndServe(":8081", nil)
