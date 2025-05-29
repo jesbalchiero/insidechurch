@@ -4,19 +4,18 @@ import (
 	"net/http"
 	"strings"
 
-	"insidechurch/backend/internal/services"
+	"insidechurch/backend/internal/core/usecases/auth"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 )
 
 type AuthMiddleware struct {
-	authService *services.AuthService
+	loginUseCase *auth.LoginUseCase
 }
 
-func NewAuthMiddleware(authService *services.AuthService) *AuthMiddleware {
+func NewAuthMiddleware(loginUseCase *auth.LoginUseCase) *AuthMiddleware {
 	return &AuthMiddleware{
-		authService: authService,
+		loginUseCase: loginUseCase,
 	}
 }
 
@@ -29,32 +28,26 @@ func (m *AuthMiddleware) Authenticate() gin.HandlerFunc {
 			return
 		}
 
-		// Remove o prefixo "Bearer " do token
-		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-		if tokenString == authHeader {
+		// Verifica se o header começa com "Bearer "
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Formato de token inválido"})
 			c.Abort()
 			return
 		}
 
-		// Valida o token
-		token, err := m.authService.ValidateToken(tokenString)
+		token := parts[1]
+
+		// Valida o token usando o caso de uso de login
+		claims, err := m.loginUseCase.ValidateToken(token)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token inválido"})
 			c.Abort()
 			return
 		}
 
-		// Extrai o ID do usuário das claims
-		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-			if userID, ok := claims["sub"].(float64); ok {
-				c.Set("user_id", uint(userID))
-				c.Next()
-				return
-			}
-		}
-
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Token inválido ou mal formatado"})
-		c.Abort()
+		// Define o user_id no contexto
+		c.Set("user_id", claims["sub"])
+		c.Next()
 	}
 }

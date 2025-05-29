@@ -1,14 +1,16 @@
 package main
 
 import (
+	"log"
 	"os"
 
 	_ "insidechurch/backend/cmd/api/docs" // Importar a documentação do Swagger
-	"insidechurch/backend/internal/handlers"
+	"insidechurch/backend/internal/adapters/handlers"
+	"insidechurch/backend/internal/adapters/repositories"
+	"insidechurch/backend/internal/core/usecases/auth"
+	"insidechurch/backend/internal/core/usecases/user"
 	"insidechurch/backend/internal/middleware"
-	"insidechurch/backend/internal/repositories"
 	"insidechurch/backend/internal/routes"
-	"insidechurch/backend/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -37,9 +39,14 @@ import (
 // @name Authorization
 // @description Type "Bearer" followed by a space and JWT token.
 func main() {
-	// Carregar variáveis de ambiente
+	// Carrega variáveis de ambiente
 	if err := godotenv.Load(); err != nil {
-		logrus.Warn("Arquivo .env não encontrado, usando variáveis do sistema.")
+		log.Println("Arquivo .env não encontrado")
+	}
+
+	// Configura o modo do Gin
+	if os.Getenv("GIN_MODE") == "release" {
+		gin.SetMode(gin.ReleaseMode)
 	}
 
 	// Configurar logger
@@ -53,20 +60,29 @@ func main() {
 		logrus.Fatalf("Erro ao conectar ao banco de dados: %v", err)
 	}
 
-	// Inicialização dos componentes
-	userRepo := repositories.NewUserRepository(db)
-	authService := services.NewAuthService(userRepo)
-	userHandler := handlers.NewUserHandler(userRepo, authService)
-	authMiddleware := middleware.NewAuthMiddleware(authService)
-	securityMiddleware := middleware.NewSecurityMiddleware()
-
-	// Configuração do router
+	// Inicializa o router
 	router := gin.Default()
 
-	// Configuração das rotas
-	routes.SetupRoutes(router, userHandler, authMiddleware, securityMiddleware)
+	// Inicializa os repositórios
+	userRepo := repositories.NewUserRepository(db)
 
-	// Porta do servidor
+	// Inicializa os casos de uso
+	loginUseCase := auth.NewLoginUseCase(userRepo)
+	registerUseCase := auth.NewRegisterUseCase(userRepo)
+	getUserUseCase := user.NewGetUserUseCase(userRepo)
+
+	// Inicializa os middlewares
+	authMiddleware := middleware.NewAuthMiddleware(loginUseCase)
+	securityMiddleware := middleware.NewSecurityMiddleware()
+
+	// Inicializa os handlers
+	authHandler := handlers.NewAuthHandler(loginUseCase, registerUseCase)
+	userHandler := handlers.NewUserHandler(getUserUseCase)
+
+	// Configura as rotas
+	routes.SetupRoutes(router, authHandler, userHandler, authMiddleware, securityMiddleware)
+
+	// Inicia o servidor
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"

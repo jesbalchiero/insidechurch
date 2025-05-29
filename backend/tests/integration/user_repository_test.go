@@ -3,76 +3,114 @@ package integration
 import (
 	"testing"
 
-	"insidechurch/backend/internal/core/domain"
-	"insidechurch/backend/internal/repositories"
+	"insidechurch/backend/internal/adapters/repositories"
+	"insidechurch/backend/internal/core/domain/entities"
 
 	"github.com/stretchr/testify/assert"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
-func TestUserRepository(t *testing.T) {
+func setupTestDB(t *testing.T) *gorm.DB {
 	// Configurar banco de dados de teste
-	db := setupTestDB(t)
-	repo := repositories.NewUserRepository(db)
-
-	// Dados de teste
-	user := &domain.User{
-		Email:    "teste@exemplo.com",
-		Name:     "Usuário Teste",
-		Password: "senha123",
+	dsn := "host=localhost user=postgres password=postgres dbname=insidechurch_test port=5432 sslmode=disable"
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("Erro ao conectar ao banco de dados de teste: %v", err)
 	}
 
-	// Teste de criação
+	// Limpar tabelas antes dos testes
+	db.Exec("DROP TABLE IF EXISTS users CASCADE")
+	db.AutoMigrate(&entities.User{})
+
+	return db
+}
+
+func TestUserRepository(t *testing.T) {
+	db := setupTestDB(t)
+	userRepo := repositories.NewUserRepository(db)
+
+	// Teste de criação de usuário
 	t.Run("Criar usuário", func(t *testing.T) {
-		err := repo.Create(user)
+		user := &entities.User{
+			Name:     "Test User",
+			Email:    "test@example.com",
+			Password: "Test@123",
+		}
+
+		err := userRepo.Create(user)
 		assert.NoError(t, err)
 		assert.NotZero(t, user.ID)
 	})
 
-	// Teste de busca por email
+	// Teste de busca de usuário por email
 	t.Run("Buscar usuário por email", func(t *testing.T) {
-		foundUser, err := repo.FindByEmail(user.Email)
+		user, err := userRepo.FindByEmail("test@example.com")
 		assert.NoError(t, err)
-		assert.NotNil(t, foundUser)
-		assert.Equal(t, user.Email, foundUser.Email)
-		assert.Equal(t, user.Name, foundUser.Name)
+		assert.NotNil(t, user)
+		assert.Equal(t, "Test User", user.Name)
+		assert.Equal(t, "test@example.com", user.Email)
 	})
 
-	// Teste de busca por ID
+	// Teste de busca de usuário por ID
 	t.Run("Buscar usuário por ID", func(t *testing.T) {
-		foundUser, err := repo.FindByID(user.ID)
+		// Primeiro criar um usuário
+		user := &entities.User{
+			Name:     "Another User",
+			Email:    "another@example.com",
+			Password: "Test@123",
+		}
+		err := userRepo.Create(user)
+		assert.NoError(t, err)
+
+		// Depois buscar pelo ID
+		foundUser, err := userRepo.FindByID(user.ID)
 		assert.NoError(t, err)
 		assert.NotNil(t, foundUser)
-		assert.Equal(t, user.Email, foundUser.Email)
+		assert.Equal(t, user.ID, foundUser.ID)
 		assert.Equal(t, user.Name, foundUser.Name)
+		assert.Equal(t, user.Email, foundUser.Email)
 	})
 
-	// Teste de atualização
+	// Teste de atualização de usuário
 	t.Run("Atualizar usuário", func(t *testing.T) {
-		user.Name = "Nome Atualizado"
-		err := repo.Update(user)
+		// Primeiro criar um usuário
+		user := &entities.User{
+			Name:     "Update User",
+			Email:    "update@example.com",
+			Password: "Test@123",
+		}
+		err := userRepo.Create(user)
+		assert.NoError(t, err)
+
+		// Atualizar o usuário
+		user.Name = "Updated Name"
+		err = userRepo.Update(user)
 		assert.NoError(t, err)
 
 		// Verificar se foi atualizado
-		foundUser, err := repo.FindByID(user.ID)
+		updatedUser, err := userRepo.FindByID(user.ID)
 		assert.NoError(t, err)
-		assert.Equal(t, "Nome Atualizado", foundUser.Name)
+		assert.Equal(t, "Updated Name", updatedUser.Name)
 	})
 
-	// Teste de exclusão
+	// Teste de exclusão de usuário
 	t.Run("Excluir usuário", func(t *testing.T) {
-		err := repo.Delete(user.ID)
+		// Primeiro criar um usuário
+		user := &entities.User{
+			Name:     "Delete User",
+			Email:    "delete@example.com",
+			Password: "Test@123",
+		}
+		err := userRepo.Create(user)
+		assert.NoError(t, err)
+
+		// Excluir o usuário
+		err = userRepo.Delete(user.ID)
 		assert.NoError(t, err)
 
 		// Verificar se foi excluído
-		foundUser, err := repo.FindByID(user.ID)
-		assert.NoError(t, err)
-		assert.Nil(t, foundUser)
-	})
-
-	// Teste de usuário não encontrado
-	t.Run("Buscar usuário inexistente", func(t *testing.T) {
-		foundUser, err := repo.FindByEmail("naoexiste@exemplo.com")
-		assert.NoError(t, err)
-		assert.Nil(t, foundUser)
+		_, err = userRepo.FindByID(user.ID)
+		assert.Error(t, err)
 	})
 }

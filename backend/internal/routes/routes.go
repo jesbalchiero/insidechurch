@@ -1,7 +1,7 @@
 package routes
 
 import (
-	"insidechurch/backend/internal/handlers"
+	"insidechurch/backend/internal/adapters/handlers"
 	"insidechurch/backend/internal/middleware"
 
 	"github.com/gin-gonic/gin"
@@ -11,6 +11,7 @@ import (
 
 func SetupRoutes(
 	router *gin.Engine,
+	authHandler *handlers.AuthHandler,
 	userHandler *handlers.UserHandler,
 	authMiddleware *middleware.AuthMiddleware,
 	securityMiddleware *middleware.SecurityMiddleware,
@@ -51,8 +52,8 @@ func SetupRoutes(
 		// Grupo de rotas de autenticação
 		auth := public.Group("/auth")
 		{
-			auth.POST("/register", userHandler.Register)
-			auth.POST("/login", userHandler.Login)
+			auth.POST("/register", authHandler.Register)
+			auth.POST("/login", authHandler.Login)
 		}
 	}
 

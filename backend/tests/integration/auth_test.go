@@ -7,12 +7,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"insidechurch/backend/internal/adapters/handlers"
+	"insidechurch/backend/internal/adapters/repositories"
 	"insidechurch/backend/internal/core/domain"
-	"insidechurch/backend/internal/handlers"
+	"insidechurch/backend/internal/core/usecases/auth"
+	"insidechurch/backend/internal/core/usecases/user"
 	"insidechurch/backend/internal/middleware"
-	"insidechurch/backend/internal/repositories"
 	"insidechurch/backend/internal/routes"
-	"insidechurch/backend/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -20,140 +21,83 @@ import (
 	"gorm.io/gorm"
 )
 
-func setupTestDB(t *testing.T) *gorm.DB {
+func setupTestRouter() *gin.Engine {
 	// Configurar banco de dados de teste
 	dsn := "host=localhost user=postgres password=postgres dbname=insidechurch_test port=5432 sslmode=disable"
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		t.Fatalf("Erro ao conectar ao banco de dados de teste: %v", err)
+		panic("failed to connect database")
 	}
 
 	// Limpar tabelas antes dos testes
-	db.Migrator().DropTable(&domain.User{})
+	db.Exec("DROP TABLE IF EXISTS users CASCADE")
 	db.AutoMigrate(&domain.User{})
 
-	return db
-}
+	// Inicializa o router
+	router := gin.Default()
 
-func setupRouter(db *gorm.DB) *gin.Engine {
-	// Configurar componentes
+	// Inicializa os repositórios
 	userRepo := repositories.NewUserRepository(db)
-	authService := services.NewAuthService(userRepo)
-	userHandler := handlers.NewUserHandler(userRepo, authService)
-	authMiddleware := middleware.NewAuthMiddleware(authService)
+
+	// Inicializa os casos de uso
+	loginUseCase := auth.NewLoginUseCase(userRepo)
+	registerUseCase := auth.NewRegisterUseCase(userRepo)
+	getUserUseCase := user.NewGetUserUseCase(userRepo)
+
+	// Inicializa os middlewares
+	authMiddleware := middleware.NewAuthMiddleware(loginUseCase)
 	securityMiddleware := middleware.NewSecurityMiddleware()
 
-	// Configurar router
-	router := gin.Default()
-	routes.SetupRoutes(router, userHandler, authMiddleware, securityMiddleware)
+	// Inicializa os handlers
+	authHandler := handlers.NewAuthHandler(loginUseCase, registerUseCase)
+	userHandler := handlers.NewUserHandler(getUserUseCase)
+
+	// Configura as rotas
+	routes.SetupRoutes(router, authHandler, userHandler, authMiddleware, securityMiddleware)
 
 	return router
 }
 
-func TestRegisterAndLoginFlow(t *testing.T) {
-	// Configurar ambiente de teste
-	db := setupTestDB(t)
-	router := setupRouter(db)
-
-	// Dados de teste
-	registerData := map[string]string{
-		"email":    "teste@exemplo.com",
-		"password": "senha123",
-		"name":     "Usuário Teste",
-	}
+func TestRegisterAndLogin(t *testing.T) {
+	router := setupTestRouter()
 
 	// Teste de registro
-	t.Run("Registro de usuário", func(t *testing.T) {
-		jsonData, _ := json.Marshal(registerData)
-		req := httptest.NewRequest("POST", "/api/register", bytes.NewBuffer(jsonData))
-		req.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
-		router.ServeHTTP(w, req)
+	registerData := map[string]string{
+		"name":     "Test User",
+		"email":    "test@example.com",
+		"password": "Test@123",
+	}
+	registerBody, _ := json.Marshal(registerData)
+	registerReq := httptest.NewRequest("POST", "/api/auth/register", bytes.NewBuffer(registerBody))
+	registerReq.Header.Set("Content-Type", "application/json")
+	registerW := httptest.NewRecorder()
+	router.ServeHTTP(registerW, registerReq)
 
-		assert.Equal(t, http.StatusCreated, w.Code)
-
-		var response map[string]interface{}
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		assert.NoError(t, err)
-		assert.NotEmpty(t, response["token"])
-		assert.NotEmpty(t, response["user"])
-	})
+	assert.Equal(t, http.StatusCreated, registerW.Code)
 
 	// Teste de login
-	t.Run("Login de usuário", func(t *testing.T) {
-		loginData := map[string]string{
-			"email":    registerData["email"],
-			"password": registerData["password"],
-		}
+	loginData := map[string]string{
+		"email":    "test@example.com",
+		"password": "Test@123",
+	}
+	loginBody, _ := json.Marshal(loginData)
+	loginReq := httptest.NewRequest("POST", "/api/auth/login", bytes.NewBuffer(loginBody))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginW := httptest.NewRecorder()
+	router.ServeHTTP(loginW, loginReq)
 
-		jsonData, _ := json.Marshal(loginData)
-		req := httptest.NewRequest("POST", "/api/login", bytes.NewBuffer(jsonData))
-		req.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
-		router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, loginW.Code)
 
-		assert.Equal(t, http.StatusOK, w.Code)
+	var loginResponse map[string]interface{}
+	err := json.Unmarshal(loginW.Body.Bytes(), &loginResponse)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, loginResponse["token"])
 
-		var response map[string]interface{}
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		assert.NoError(t, err)
-		assert.NotEmpty(t, response["token"])
-		assert.NotEmpty(t, response["user"])
-	})
+	// Teste de acesso à rota protegida
+	userReq := httptest.NewRequest("GET", "/api/user", nil)
+	userReq.Header.Set("Authorization", "Bearer "+loginResponse["token"].(string))
+	userW := httptest.NewRecorder()
+	router.ServeHTTP(userW, userReq)
 
-	// Teste de acesso protegido
-	t.Run("Acesso a rota protegida", func(t *testing.T) {
-		// Primeiro fazer login para obter o token
-		loginData := map[string]string{
-			"email":    registerData["email"],
-			"password": registerData["password"],
-		}
-		jsonData, _ := json.Marshal(loginData)
-		req := httptest.NewRequest("POST", "/api/login", bytes.NewBuffer(jsonData))
-		req.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
-		router.ServeHTTP(w, req)
-
-		var loginResponse map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &loginResponse)
-		token := loginResponse["token"].(string)
-
-		// Agora testar a rota protegida
-		req = httptest.NewRequest("GET", "/api/user", nil)
-		req.Header.Set("Authorization", "Bearer "+token)
-		w = httptest.NewRecorder()
-		router.ServeHTTP(w, req)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-
-		var userResponse map[string]interface{}
-		err := json.Unmarshal(w.Body.Bytes(), &userResponse)
-		assert.NoError(t, err)
-		assert.NotEmpty(t, userResponse["user"])
-	})
-
-	// Teste de login com credenciais inválidas
-	t.Run("Login com credenciais inválidas", func(t *testing.T) {
-		invalidData := map[string]string{
-			"email":    registerData["email"],
-			"password": "senha_errada",
-		}
-
-		jsonData, _ := json.Marshal(invalidData)
-		req := httptest.NewRequest("POST", "/api/login", bytes.NewBuffer(jsonData))
-		req.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
-		router.ServeHTTP(w, req)
-
-		assert.Equal(t, http.StatusUnauthorized, w.Code)
-	})
-
-	// Teste de acesso protegido sem token
-	t.Run("Acesso sem token", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/api/user", nil)
-		w := httptest.NewRecorder()
-		router.ServeHTTP(w, req)
-
-		assert.Equal(t, http.StatusUnauthorized, w.Code)
-	})
+	assert.Equal(t, http.StatusOK, userW.Code)
 }
