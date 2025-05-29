@@ -13,7 +13,7 @@
 import { ref } from 'vue'
 import { useAuth } from '../composables/useAuth'
 import { useRouter } from 'vue-router'
-import { useToast } from 'vue-toastification'
+import { useToast } from '../composables/useToast'
 
 const auth = useAuth()
 const router = useRouter()

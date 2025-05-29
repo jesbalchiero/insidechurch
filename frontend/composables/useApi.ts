@@ -1,6 +1,6 @@
 import type { NitroFetchOptions } from 'nitropack'
 import { useAuthStore } from '~/stores/auth'
-import { useToast } from 'vue-toastification'
+import { useToast } from './useToast'
 
 export const useApi = () => {
   const config = useRuntimeConfig()

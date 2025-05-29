@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useToast } from 'vue-toastification'
+import { useToast } from './useToast'
 import type { LoginRequest, RegisterRequest, User } from '~/types'
 
 export const useAuth = () => {
@@ -25,7 +25,9 @@ export const useAuth = () => {
 
       const data = await response.json()
       user.value = data.user
-      localStorage.setItem('token', data.token)
+      if (process.client) {
+        localStorage.setItem('token', data.token)
+      }
       toast.success('Login realizado com sucesso!')
       router.push('/dashboard')
     } catch (error) {
@@ -63,7 +65,10 @@ export const useAuth = () => {
   const getUser = async () => {
     try {
       loading.value = true
-      const token = localStorage.getItem('token')
+      let token = null
+      if (process.client) {
+        token = localStorage.getItem('token')
+      }
       
       if (!token) {
         throw new Error('Token não encontrado')
@@ -77,7 +82,9 @@ export const useAuth = () => {
 
       if (!response.ok) {
         if (response.status === 401) {
-          localStorage.removeItem('token')
+          if (process.client) {
+            localStorage.removeItem('token')
+          }
           router.push('/login')
         }
         const error = await response.json()
@@ -97,7 +104,9 @@ export const useAuth = () => {
 
   const logout = () => {
     user.value = null
-    localStorage.removeItem('token')
+    if (process.client) {
+      localStorage.removeItem('token')
+    }
     router.push('/login')
   }
 

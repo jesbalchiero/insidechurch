@@ -20,13 +20,13 @@ services:
       timeout: 2s
       retries: 3
       start_period: 5s
+    restart: unless-stopped
 
   backend:
     container_name: backend
     build:
       context: ./backend
       dockerfile: Dockerfile
-      target: builder
     ports:
       - "8080:8080"
     environment:
@@ -36,10 +36,7 @@ services:
       - DB_NAME=insidechurch
       - DB_PORT=5432
       - JWT_SECRET=your-secret-key
-      - GIN_MODE=debug
-    volumes:
-      - ./backend:/app
-      - backend_cache:/go/pkg/mod
+      - GIN_MODE=release
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,21 +48,18 @@ services:
       timeout: 3s
       retries: 3
       start_period: 5s
+    restart: unless-stopped
 
   frontend:
     container_name: frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      target: builder
     ports:
       - "3000:3000"
     environment:
       - NUXT_PUBLIC_API_BASE=http://localhost:8080
-      - NODE_ENV=development
-    volumes:
-      - ./frontend:/app
-      - frontend_cache:/app/node_modules
+      - NODE_ENV=production
     depends_on:
       backend:
         condition: service_healthy
@@ -77,12 +71,11 @@ services:
       timeout: 3s
       retries: 3
       start_period: 5s
+    restart: unless-stopped
 
 networks:
   app-network:
     driver: bridge
 
 volumes:
-  postgres_data:
-  backend_cache:
-  frontend_cache: 
+  postgres_data: 

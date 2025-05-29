@@ -9,16 +9,39 @@ WORKDIR /app
 # Copy package files
 COPY package.json yarn.lock ./
 
-# Install dependencies
-RUN yarn install --frozen-lockfile --production=false
+# Install dependencies with cache mount
+RUN --mount=type=cache,target=/app/.yarn-cache \
+    yarn install --frozen-lockfile --network-timeout 600000
 
 # Copy project files
 COPY . .
 
-# Clean cache and build the application
-RUN rm -rf .nuxt node_modules/.vite && \
-    yarn install --frozen-lockfile && \
-    yarn build
+# Build the application
+RUN yarn build
+
+# Development stage
+FROM node:20-alpine AS dev
+
+# Add non-root user
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json yarn.lock ./
+
+# Install dependencies with cache mount
+RUN --mount=type=cache,target=/app/.yarn-cache \
+    yarn install --frozen-lockfile --network-timeout 600000
+
+# Copy project files
+COPY . .
+
+# Expose port
+EXPOSE 3000
+
+# Start development server
+CMD ["yarn", "dev"]
 
 # Production stage
 FROM node:20-alpine
@@ -33,9 +56,9 @@ COPY --from=builder /app/.output ./.output
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/yarn.lock ./
 
-# Install production dependencies
-RUN yarn install --frozen-lockfile --production && \
-    yarn cache clean
+# Install production dependencies with cache mount
+RUN --mount=type=cache,target=/app/.yarn-cache \
+    yarn install --production --frozen-lockfile --network-timeout 600000
 
 # Set proper permissions
 RUN chown -R appuser:appgroup /app

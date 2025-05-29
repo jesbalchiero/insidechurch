@@ -25,19 +25,15 @@ fi
 
 # Parar containers existentes
 echo -e "${YELLOW}Parando containers existentes...${NC}"
-docker-compose down
-
-# Remover volumes antigos
-echo -e "${YELLOW}Removendo volumes antigos...${NC}"
-docker volume rm insidechurch_postgres_data insidechurch_backend_cache insidechurch_frontend_cache 2>/dev/null || true
+docker-compose -f docker-compose.prod.yml down
 
 # Rebuildar imagens
 echo -e "${YELLOW}Rebuildando imagens...${NC}"
-docker-compose build --no-cache
+docker-compose -f docker-compose.prod.yml build --no-cache
 
-# Iniciar containers
+# Iniciar containers em background
 echo -e "${YELLOW}Iniciando containers...${NC}"
-docker-compose up --force-recreate
+docker-compose -f docker-compose.prod.yml up -d
 
 # Aguardar todos os serviços estarem prontos
 echo -e "${YELLOW}Aguardando serviços iniciarem...${NC}"
@@ -45,9 +41,9 @@ sleep 10
 
 # Verificar status dos containers
 echo -e "${YELLOW}Verificando status dos containers...${NC}"
-if docker-compose ps | grep -q "Exit"; then
+if docker-compose -f docker-compose.prod.yml ps | grep -q "Exit"; then
     echo -e "${RED}Alguns containers falharam ao iniciar. Verifique os logs:${NC}"
-    docker-compose logs
+    docker-compose -f docker-compose.prod.yml logs
     exit 1
 fi
 

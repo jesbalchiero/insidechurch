@@ -9,13 +9,44 @@ RUN apt-get update && apt-get install -y git ca-certificates tzdata && \
 
 # Copiar arquivos de dependências
 COPY go.mod go.sum ./
-RUN go mod download
+
+# Download de dependências com cache
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
 # Copiar código fonte
 COPY . .
 
 # Compilar a aplicação com flags de segurança
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o main ./cmd/api
+
+# Development stage
+FROM golang:1.23 AS dev
+
+WORKDIR /app
+
+# Instalar dependências necessárias
+RUN apt-get update && apt-get install -y git ca-certificates tzdata && \
+    update-ca-certificates
+
+# Instalar air para hot reload
+RUN go install github.com/cosmtrek/air@latest
+
+# Copiar arquivos de dependências
+COPY go.mod go.sum ./
+
+# Download de dependências com cache
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+# Copiar código fonte
+COPY . .
+
+# Expor porta
+EXPOSE 8080
+
+# Comando para executar a aplicação em desenvolvimento
+CMD ["air", "-c", ".air.toml"]
 
 # Final stage
 FROM alpine:3.19

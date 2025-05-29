@@ -2,7 +2,11 @@ import { useAuth } from '~/composables/useAuth'
 
 export default defineNuxtPlugin(async () => {
   const auth = useAuth()
-  const token = localStorage.getItem('token')
+  let token = null
+  
+  if (process.client) {
+    token = localStorage.getItem('token')
+  }
 
   if (token) {
     try {

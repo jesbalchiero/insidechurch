@@ -161,7 +161,7 @@
 <script setup lang="ts">
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/vue'
 import { useAuth } from '~/composables/useAuth'
-import { useToast } from 'vue-toastification'
+import { useToast } from '~/composables/useToast'
 
 const auth = useAuth()
 const isOpen = ref(false)
