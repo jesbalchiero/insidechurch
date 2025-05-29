@@ -11,10 +11,12 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/time/rate"
 
 	"github.com/insidechurch/auth-service/infrastructure/logger"
+	"github.com/insidechurch/auth-service/infrastructure/metrics"
 )
 
 var (
@@ -94,10 +96,12 @@ func rateLimitMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 		// Verificar se a requisição pode prosseguir
 		if !limiter.Allow() {
+			metrics.RateLimitHits.WithLabelValues("rejected").Inc()
 			http.Error(w, "Limite de requisições excedido", http.StatusTooManyRequests)
 			return
 		}
 
+		metrics.RateLimitHits.WithLabelValues("allowed").Inc()
 		next.ServeHTTP(w, r)
 	}
 }
@@ -205,6 +209,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 			logger.String("path", r.URL.Path),
 			logger.String("ip", r.RemoteAddr),
 		)
+		metrics.RegisterAttempts.WithLabelValues("failure").Inc()
 		http.Error(w, "JSON inválido", http.StatusBadRequest)
 		return
 	}
@@ -216,6 +221,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 				logger.String("email", req.Email),
 				logger.String("ip", r.RemoteAddr),
 			)
+			metrics.RegisterAttempts.WithLabelValues("failure").Inc()
 			http.Error(w, "Email já está em uso", http.StatusBadRequest)
 			return
 		}
@@ -227,6 +233,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 		log.Error("Erro ao gerar hash da senha", err,
 			logger.String("email", req.Email),
 		)
+		metrics.RegisterAttempts.WithLabelValues("failure").Inc()
 		http.Error(w, "Erro ao processar senha", http.StatusInternalServerError)
 		return
 	}
@@ -245,9 +252,15 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 		log.Error("Erro ao gerar tokens", err,
 			logger.String("user_id", newUser.ID),
 		)
+		metrics.RegisterAttempts.WithLabelValues("failure").Inc()
 		http.Error(w, "Erro ao gerar tokens", http.StatusInternalServerError)
 		return
 	}
+
+	metrics.RegisterAttempts.WithLabelValues("success").Inc()
+	metrics.ActiveUsers.Inc()
+	metrics.TokenGenerations.WithLabelValues("access").Inc()
+	metrics.TokenGenerations.WithLabelValues("refresh").Inc()
 
 	log.Info("Usuário registrado com sucesso",
 		logger.String("user_id", newUser.ID),
@@ -271,6 +284,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 			logger.String("path", r.URL.Path),
 			logger.String("ip", r.RemoteAddr),
 		)
+		metrics.LoginAttempts.WithLabelValues("failure").Inc()
 		http.Error(w, "JSON inválido", http.StatusBadRequest)
 		return
 	}
@@ -289,6 +303,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 			logger.String("email", req.Email),
 			logger.String("ip", r.RemoteAddr),
 		)
+		metrics.LoginAttempts.WithLabelValues("failure").Inc()
 		http.Error(w, "Credenciais inválidas", http.StatusUnauthorized)
 		return
 	}
@@ -299,6 +314,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 			logger.String("email", req.Email),
 			logger.String("ip", r.RemoteAddr),
 		)
+		metrics.LoginAttempts.WithLabelValues("failure").Inc()
 		http.Error(w, "Credenciais inválidas", http.StatusUnauthorized)
 		return
 	}
@@ -309,9 +325,14 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		log.Error("Erro ao gerar tokens", err,
 			logger.String("user_id", user.ID),
 		)
+		metrics.LoginAttempts.WithLabelValues("failure").Inc()
 		http.Error(w, "Erro ao gerar tokens", http.StatusInternalServerError)
 		return
 	}
+
+	metrics.LoginAttempts.WithLabelValues("success").Inc()
+	metrics.TokenGenerations.WithLabelValues("access").Inc()
+	metrics.TokenGenerations.WithLabelValues("refresh").Inc()
 
 	log.Info("Login realizado com sucesso",
 		logger.String("user_id", user.ID),
@@ -330,6 +351,7 @@ func refreshHandler(w http.ResponseWriter, r *http.Request) {
 
 	var req RefreshRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		metrics.TokenValidations.WithLabelValues("invalid").Inc()
 		http.Error(w, "JSON inválido", http.StatusBadRequest)
 		return
 	}
@@ -341,12 +363,14 @@ func refreshHandler(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil || !token.Valid {
+		metrics.TokenValidations.WithLabelValues("invalid").Inc()
 		http.Error(w, "Token inválido", http.StatusUnauthorized)
 		return
 	}
 
 	// Verificar se é um refresh token
 	if claims.Type != "refresh" {
+		metrics.TokenValidations.WithLabelValues("invalid").Inc()
 		http.Error(w, "Token inválido", http.StatusUnauthorized)
 		return
 	}
@@ -354,9 +378,15 @@ func refreshHandler(w http.ResponseWriter, r *http.Request) {
 	// Gerar novo par de tokens
 	tokenPair, err := generateTokenPair(claims.UserID)
 	if err != nil {
+		metrics.TokenValidations.WithLabelValues("invalid").Inc()
 		http.Error(w, "Erro ao gerar tokens", http.StatusInternalServerError)
 		return
 	}
+
+	metrics.TokenValidations.WithLabelValues("valid").Inc()
+	metrics.TokenRefreshes.Inc()
+	metrics.TokenGenerations.WithLabelValues("access").Inc()
+	metrics.TokenGenerations.WithLabelValues("refresh").Inc()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tokenPair)
@@ -373,6 +403,7 @@ func validateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		metrics.TokenValidations.WithLabelValues("invalid").Inc()
 		http.Error(w, "JSON inválido", http.StatusBadRequest)
 		return
 	}
@@ -383,9 +414,12 @@ func validateHandler(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil || !token.Valid {
+		metrics.TokenValidations.WithLabelValues("invalid").Inc()
 		http.Error(w, "Token inválido", http.StatusUnauthorized)
 		return
 	}
+
+	metrics.TokenValidations.WithLabelValues("valid").Inc()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(claims)
@@ -442,16 +476,19 @@ func main() {
 	}
 	defer auditLogger.Close()
 
-	// Rotas públicas com rate limiting e auditoria
-	http.HandleFunc("/auth/register", auditMiddleware(rateLimitMiddleware(registerHandler)))
-	http.HandleFunc("/auth/login", auditMiddleware(rateLimitMiddleware(loginHandler)))
-	http.HandleFunc("/auth/refresh", auditMiddleware(rateLimitMiddleware(refreshHandler)))
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	// Rotas públicas com rate limiting, auditoria e métricas
+	http.Handle("/auth/register", metrics.MetricsMiddleware(auditMiddleware(rateLimitMiddleware(registerHandler))))
+	http.Handle("/auth/login", metrics.MetricsMiddleware(auditMiddleware(rateLimitMiddleware(loginHandler))))
+	http.Handle("/auth/refresh", metrics.MetricsMiddleware(auditMiddleware(rateLimitMiddleware(refreshHandler))))
+	http.Handle("/health", metrics.MetricsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "ok")
-	})
+	})))
 
-	// Rotas protegidas com rate limiting, autenticação e auditoria
-	http.HandleFunc("/auth/validate", auditMiddleware(rateLimitMiddleware(authMiddleware(validateHandler))))
+	// Rotas protegidas com rate limiting, autenticação, auditoria e métricas
+	http.Handle("/auth/validate", metrics.MetricsMiddleware(auditMiddleware(rateLimitMiddleware(authMiddleware(validateHandler)))))
+
+	// Endpoint do Prometheus
+	http.Handle("/metrics", promhttp.Handler())
 
 	log.Info("Serviço de autenticação iniciado",
 		logger.String("port", "8081"),
