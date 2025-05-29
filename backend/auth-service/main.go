@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/time/rate"
 )
 
 // Tipo personalizado para chaves do contexto
@@ -19,6 +21,71 @@ type contextKey string
 const (
 	userIDKey contextKey = "user_id"
 )
+
+// Estrutura para armazenar os limitadores por usuário
+type userRateLimiter struct {
+	limiters map[string]*rate.Limiter
+	mu       sync.RWMutex
+}
+
+// Configurações do rate limiter
+const (
+	requestsPerMinute = 60 // 60 requisições por minuto
+	burstSize         = 10 // Permite até 10 requisições em burst
+)
+
+var (
+	limiter = &userRateLimiter{
+		limiters: make(map[string]*rate.Limiter),
+	}
+)
+
+// Obtém ou cria um limitador para um usuário específico
+func (rl *userRateLimiter) getLimiter(userID string) *rate.Limiter {
+	rl.mu.RLock()
+	limiter, exists := rl.limiters[userID]
+	rl.mu.RUnlock()
+
+	if exists {
+		return limiter
+	}
+
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	// Verificar novamente após adquirir o lock (double-check pattern)
+	limiter, exists = rl.limiters[userID]
+	if exists {
+		return limiter
+	}
+
+	// Criar novo limitador
+	limiter = rate.NewLimiter(rate.Every(time.Minute/requestsPerMinute), burstSize)
+	rl.limiters[userID] = limiter
+	return limiter
+}
+
+// Middleware de rate limiting
+func rateLimitMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Obter o ID do usuário do contexto (se disponível)
+		userID := "anonymous"
+		if claims, ok := r.Context().Value(userIDKey).(string); ok {
+			userID = claims
+		}
+
+		// Obter o limitador para o usuário
+		limiter := limiter.getLimiter(userID)
+
+		// Verificar se a requisição pode prosseguir
+		if !limiter.Allow() {
+			http.Error(w, "Limite de requisições excedido", http.StatusTooManyRequests)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	}
+}
 
 type User struct {
 	ID       string `json:"id"`
@@ -312,16 +379,16 @@ func main() {
 		os.Setenv("JWT_SECRET", "sua_chave_secreta_aqui")
 	}
 
-	// Rotas públicas
-	http.HandleFunc("/auth/register", registerHandler)
-	http.HandleFunc("/auth/login", loginHandler)
-	http.HandleFunc("/auth/refresh", refreshHandler)
+	// Rotas públicas com rate limiting
+	http.HandleFunc("/auth/register", rateLimitMiddleware(registerHandler))
+	http.HandleFunc("/auth/login", rateLimitMiddleware(loginHandler))
+	http.HandleFunc("/auth/refresh", rateLimitMiddleware(refreshHandler))
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "ok")
 	})
 
-	// Rotas protegidas
-	http.HandleFunc("/auth/validate", authMiddleware(validateHandler))
+	// Rotas protegidas com rate limiting e autenticação
+	http.HandleFunc("/auth/validate", rateLimitMiddleware(authMiddleware(validateHandler)))
 
 	fmt.Println("Auth Service rodando na porta 8081")
 	http.ListenAndServe(":8081", nil)
