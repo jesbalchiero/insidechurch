@@ -27,4 +27,18 @@ $$ language 'plpgsql';
 CREATE TRIGGER update_users_updated_at
     BEFORE UPDATE ON users
     FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column(); 
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Tabela de eventos para Event Sourcing
+CREATE TABLE IF NOT EXISTS events (
+    id UUID PRIMARY KEY,
+    aggregate_id VARCHAR(255) NOT NULL,
+    event_type VARCHAR(255) NOT NULL,
+    event_data JSONB NOT NULL,
+    version INTEGER NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT events_aggregate_version UNIQUE (aggregate_id, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_aggregate_id ON events(aggregate_id);
+CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at); 
