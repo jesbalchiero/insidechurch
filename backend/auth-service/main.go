@@ -17,6 +17,7 @@ import (
 
 	"github.com/insidechurch/auth-service/infrastructure/logger"
 	"github.com/insidechurch/auth-service/infrastructure/metrics"
+	"github.com/insidechurch/auth-service/infrastructure/tracing"
 )
 
 var (
@@ -197,232 +198,280 @@ func generateTokenPair(userID string) (*TokenPair, error) {
 }
 
 func registerHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
-		return
-	}
+	ctx := r.Context()
+	err := tracing.TraceSpanWithAttributes(ctx, "register", map[string]string{
+		"method": r.Method,
+		"path":   r.URL.Path,
+		"ip":     r.RemoteAddr,
+	}, func(ctx context.Context) error {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
+			return nil
+		}
 
-	var req RegisterRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Error("Erro ao decodificar requisição de registro", err,
-			logger.String("method", r.Method),
-			logger.String("path", r.URL.Path),
-			logger.String("ip", r.RemoteAddr),
-		)
-		metrics.RegisterAttempts.WithLabelValues("failure").Inc()
-		http.Error(w, "JSON inválido", http.StatusBadRequest)
-		return
-	}
-
-	// Verificar se o email já está em uso
-	for _, u := range users {
-		if u.Email == req.Email {
-			log.Info("Tentativa de registro com email já existente",
-				logger.String("email", req.Email),
+		var req RegisterRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			log.Error("Erro ao decodificar requisição de registro", err,
+				logger.String("method", r.Method),
+				logger.String("path", r.URL.Path),
 				logger.String("ip", r.RemoteAddr),
 			)
 			metrics.RegisterAttempts.WithLabelValues("failure").Inc()
-			http.Error(w, "Email já está em uso", http.StatusBadRequest)
-			return
+			http.Error(w, "JSON inválido", http.StatusBadRequest)
+			return nil
 		}
-	}
 
-	// Gerar hash da senha
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		log.Error("Erro ao gerar hash da senha", err,
-			logger.String("email", req.Email),
-		)
-		metrics.RegisterAttempts.WithLabelValues("failure").Inc()
-		http.Error(w, "Erro ao processar senha", http.StatusInternalServerError)
-		return
-	}
+		// Verificar se o email já está em uso
+		for _, u := range users {
+			if u.Email == req.Email {
+				log.Info("Tentativa de registro com email já existente",
+					logger.String("email", req.Email),
+					logger.String("ip", r.RemoteAddr),
+				)
+				metrics.RegisterAttempts.WithLabelValues("failure").Inc()
+				http.Error(w, "Email já está em uso", http.StatusBadRequest)
+				return nil
+			}
+		}
 
-	// Criar novo usuário
-	newUser := User{
-		ID:       fmt.Sprintf("%d", len(users)+1),
-		Email:    req.Email,
-		Password: string(hashedPassword),
-	}
-	users = append(users, newUser)
+		// Gerar hash da senha
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			log.Error("Erro ao gerar hash da senha", err,
+				logger.String("email", req.Email),
+			)
+			metrics.RegisterAttempts.WithLabelValues("failure").Inc()
+			http.Error(w, "Erro ao processar senha", http.StatusInternalServerError)
+			return err
+		}
 
-	// Gerar tokens
-	tokenPair, err := generateTokenPair(newUser.ID)
-	if err != nil {
-		log.Error("Erro ao gerar tokens", err,
+		// Criar novo usuário
+		newUser := User{
+			ID:       fmt.Sprintf("%d", len(users)+1),
+			Email:    req.Email,
+			Password: string(hashedPassword),
+		}
+		users = append(users, newUser)
+
+		// Gerar tokens
+		tokenPair, err := generateTokenPair(newUser.ID)
+		if err != nil {
+			log.Error("Erro ao gerar tokens", err,
+				logger.String("user_id", newUser.ID),
+			)
+			metrics.RegisterAttempts.WithLabelValues("failure").Inc()
+			http.Error(w, "Erro ao gerar tokens", http.StatusInternalServerError)
+			return err
+		}
+
+		metrics.RegisterAttempts.WithLabelValues("success").Inc()
+		metrics.ActiveUsers.Inc()
+		metrics.TokenGenerations.WithLabelValues("access").Inc()
+		metrics.TokenGenerations.WithLabelValues("refresh").Inc()
+
+		log.Info("Usuário registrado com sucesso",
 			logger.String("user_id", newUser.ID),
+			logger.String("email", newUser.Email),
 		)
-		metrics.RegisterAttempts.WithLabelValues("failure").Inc()
-		http.Error(w, "Erro ao gerar tokens", http.StatusInternalServerError)
-		return
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(tokenPair)
+		return nil
+	})
+
+	if err != nil {
+		log.Error("Erro no handler de registro", err)
 	}
-
-	metrics.RegisterAttempts.WithLabelValues("success").Inc()
-	metrics.ActiveUsers.Inc()
-	metrics.TokenGenerations.WithLabelValues("access").Inc()
-	metrics.TokenGenerations.WithLabelValues("refresh").Inc()
-
-	log.Info("Usuário registrado com sucesso",
-		logger.String("user_id", newUser.ID),
-		logger.String("email", newUser.Email),
-	)
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tokenPair)
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req LoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Error("Erro ao decodificar requisição de login", err,
-			logger.String("method", r.Method),
-			logger.String("path", r.URL.Path),
-			logger.String("ip", r.RemoteAddr),
-		)
-		metrics.LoginAttempts.WithLabelValues("failure").Inc()
-		http.Error(w, "JSON inválido", http.StatusBadRequest)
-		return
-	}
-
-	// Encontrar usuário
-	var user *User
-	for _, u := range users {
-		if u.Email == req.Email {
-			user = &u
-			break
+	ctx := r.Context()
+	err := tracing.TraceSpanWithAttributes(ctx, "login", map[string]string{
+		"method": r.Method,
+		"path":   r.URL.Path,
+		"ip":     r.RemoteAddr,
+	}, func(ctx context.Context) error {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
+			return nil
 		}
-	}
 
-	if user == nil {
-		log.Info("Tentativa de login com email não encontrado",
-			logger.String("email", req.Email),
-			logger.String("ip", r.RemoteAddr),
-		)
-		metrics.LoginAttempts.WithLabelValues("failure").Inc()
-		http.Error(w, "Credenciais inválidas", http.StatusUnauthorized)
-		return
-	}
+		var req LoginRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			log.Error("Erro ao decodificar requisição de login", err,
+				logger.String("method", r.Method),
+				logger.String("path", r.URL.Path),
+				logger.String("ip", r.RemoteAddr),
+			)
+			metrics.LoginAttempts.WithLabelValues("failure").Inc()
+			http.Error(w, "JSON inválido", http.StatusBadRequest)
+			return nil
+		}
 
-	// Verificar senha
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		log.Info("Tentativa de login com senha inválida",
-			logger.String("email", req.Email),
-			logger.String("ip", r.RemoteAddr),
-		)
-		metrics.LoginAttempts.WithLabelValues("failure").Inc()
-		http.Error(w, "Credenciais inválidas", http.StatusUnauthorized)
-		return
-	}
+		// Encontrar usuário
+		var user *User
+		for _, u := range users {
+			if u.Email == req.Email {
+				user = &u
+				break
+			}
+		}
 
-	// Gerar tokens
-	tokenPair, err := generateTokenPair(user.ID)
-	if err != nil {
-		log.Error("Erro ao gerar tokens", err,
+		if user == nil {
+			log.Info("Tentativa de login com email não encontrado",
+				logger.String("email", req.Email),
+				logger.String("ip", r.RemoteAddr),
+			)
+			metrics.LoginAttempts.WithLabelValues("failure").Inc()
+			http.Error(w, "Credenciais inválidas", http.StatusUnauthorized)
+			return nil
+		}
+
+		// Verificar senha
+		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+			log.Info("Tentativa de login com senha inválida",
+				logger.String("email", req.Email),
+				logger.String("ip", r.RemoteAddr),
+			)
+			metrics.LoginAttempts.WithLabelValues("failure").Inc()
+			http.Error(w, "Credenciais inválidas", http.StatusUnauthorized)
+			return nil
+		}
+
+		// Gerar tokens
+		tokenPair, err := generateTokenPair(user.ID)
+		if err != nil {
+			log.Error("Erro ao gerar tokens", err,
+				logger.String("user_id", user.ID),
+			)
+			metrics.LoginAttempts.WithLabelValues("failure").Inc()
+			http.Error(w, "Erro ao gerar tokens", http.StatusInternalServerError)
+			return err
+		}
+
+		metrics.LoginAttempts.WithLabelValues("success").Inc()
+		metrics.TokenGenerations.WithLabelValues("access").Inc()
+		metrics.TokenGenerations.WithLabelValues("refresh").Inc()
+
+		log.Info("Login realizado com sucesso",
 			logger.String("user_id", user.ID),
+			logger.String("email", user.Email),
 		)
-		metrics.LoginAttempts.WithLabelValues("failure").Inc()
-		http.Error(w, "Erro ao gerar tokens", http.StatusInternalServerError)
-		return
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(tokenPair)
+		return nil
+	})
+
+	if err != nil {
+		log.Error("Erro no handler de login", err)
 	}
-
-	metrics.LoginAttempts.WithLabelValues("success").Inc()
-	metrics.TokenGenerations.WithLabelValues("access").Inc()
-	metrics.TokenGenerations.WithLabelValues("refresh").Inc()
-
-	log.Info("Login realizado com sucesso",
-		logger.String("user_id", user.ID),
-		logger.String("email", user.Email),
-	)
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tokenPair)
 }
 
 func refreshHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
-		return
-	}
+	ctx := r.Context()
+	err := tracing.TraceSpanWithAttributes(ctx, "refresh", map[string]string{
+		"method": r.Method,
+		"path":   r.URL.Path,
+		"ip":     r.RemoteAddr,
+	}, func(ctx context.Context) error {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
+			return nil
+		}
 
-	var req RefreshRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		metrics.TokenValidations.WithLabelValues("invalid").Inc()
-		http.Error(w, "JSON inválido", http.StatusBadRequest)
-		return
-	}
+		var req RefreshRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			metrics.TokenValidations.WithLabelValues("invalid").Inc()
+			http.Error(w, "JSON inválido", http.StatusBadRequest)
+			return nil
+		}
 
-	// Validar refresh token
-	claims := &Claims{}
-	token, err := jwt.ParseWithClaims(req.RefreshToken, claims, func(token *jwt.Token) (interface{}, error) {
-		return jwtKey, nil
+		// Validar refresh token
+		claims := &Claims{}
+		token, err := jwt.ParseWithClaims(req.RefreshToken, claims, func(token *jwt.Token) (interface{}, error) {
+			return jwtKey, nil
+		})
+
+		if err != nil || !token.Valid {
+			metrics.TokenValidations.WithLabelValues("invalid").Inc()
+			http.Error(w, "Token inválido", http.StatusUnauthorized)
+			return nil
+		}
+
+		// Verificar se é um refresh token
+		if claims.Type != "refresh" {
+			metrics.TokenValidations.WithLabelValues("invalid").Inc()
+			http.Error(w, "Token inválido", http.StatusUnauthorized)
+			return nil
+		}
+
+		// Gerar novo par de tokens
+		tokenPair, err := generateTokenPair(claims.UserID)
+		if err != nil {
+			metrics.TokenValidations.WithLabelValues("invalid").Inc()
+			http.Error(w, "Erro ao gerar tokens", http.StatusInternalServerError)
+			return err
+		}
+
+		metrics.TokenValidations.WithLabelValues("valid").Inc()
+		metrics.TokenRefreshes.Inc()
+		metrics.TokenGenerations.WithLabelValues("access").Inc()
+		metrics.TokenGenerations.WithLabelValues("refresh").Inc()
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(tokenPair)
+		return nil
 	})
 
-	if err != nil || !token.Valid {
-		metrics.TokenValidations.WithLabelValues("invalid").Inc()
-		http.Error(w, "Token inválido", http.StatusUnauthorized)
-		return
-	}
-
-	// Verificar se é um refresh token
-	if claims.Type != "refresh" {
-		metrics.TokenValidations.WithLabelValues("invalid").Inc()
-		http.Error(w, "Token inválido", http.StatusUnauthorized)
-		return
-	}
-
-	// Gerar novo par de tokens
-	tokenPair, err := generateTokenPair(claims.UserID)
 	if err != nil {
-		metrics.TokenValidations.WithLabelValues("invalid").Inc()
-		http.Error(w, "Erro ao gerar tokens", http.StatusInternalServerError)
-		return
+		log.Error("Erro no handler de refresh", err)
 	}
-
-	metrics.TokenValidations.WithLabelValues("valid").Inc()
-	metrics.TokenRefreshes.Inc()
-	metrics.TokenGenerations.WithLabelValues("access").Inc()
-	metrics.TokenGenerations.WithLabelValues("refresh").Inc()
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tokenPair)
 }
 
 func validateHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
-		return
-	}
+	ctx := r.Context()
+	err := tracing.TraceSpanWithAttributes(ctx, "validate", map[string]string{
+		"method": r.Method,
+		"path":   r.URL.Path,
+		"ip":     r.RemoteAddr,
+	}, func(ctx context.Context) error {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
+			return nil
+		}
 
-	var req struct {
-		Token string `json:"token"`
-	}
+		var req struct {
+			Token string `json:"token"`
+		}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		metrics.TokenValidations.WithLabelValues("invalid").Inc()
-		http.Error(w, "JSON inválido", http.StatusBadRequest)
-		return
-	}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			metrics.TokenValidations.WithLabelValues("invalid").Inc()
+			http.Error(w, "JSON inválido", http.StatusBadRequest)
+			return nil
+		}
 
-	claims := &Claims{}
-	token, err := jwt.ParseWithClaims(req.Token, claims, func(token *jwt.Token) (interface{}, error) {
-		return jwtKey, nil
+		claims := &Claims{}
+		token, err := jwt.ParseWithClaims(req.Token, claims, func(token *jwt.Token) (interface{}, error) {
+			return jwtKey, nil
+		})
+
+		if err != nil || !token.Valid {
+			metrics.TokenValidations.WithLabelValues("invalid").Inc()
+			http.Error(w, "Token inválido", http.StatusUnauthorized)
+			return nil
+		}
+
+		metrics.TokenValidations.WithLabelValues("valid").Inc()
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(claims)
+		return nil
 	})
 
-	if err != nil || !token.Valid {
-		metrics.TokenValidations.WithLabelValues("invalid").Inc()
-		http.Error(w, "Token inválido", http.StatusUnauthorized)
-		return
+	if err != nil {
+		log.Error("Erro no handler de validação", err)
 	}
-
-	metrics.TokenValidations.WithLabelValues("valid").Inc()
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(claims)
 }
 
 func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -476,16 +525,22 @@ func main() {
 	}
 	defer auditLogger.Close()
 
-	// Rotas públicas com rate limiting, auditoria e métricas
-	http.Handle("/auth/register", metrics.MetricsMiddleware(auditMiddleware(rateLimitMiddleware(registerHandler))))
-	http.Handle("/auth/login", metrics.MetricsMiddleware(auditMiddleware(rateLimitMiddleware(loginHandler))))
-	http.Handle("/auth/refresh", metrics.MetricsMiddleware(auditMiddleware(rateLimitMiddleware(refreshHandler))))
-	http.Handle("/health", metrics.MetricsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "ok")
-	})))
+	// Inicializar o tracer
+	if err := tracing.InitTracer("auth-service"); err != nil {
+		log.Error("Erro ao inicializar tracer", err)
+		os.Exit(1)
+	}
 
-	// Rotas protegidas com rate limiting, autenticação, auditoria e métricas
-	http.Handle("/auth/validate", metrics.MetricsMiddleware(auditMiddleware(rateLimitMiddleware(authMiddleware(validateHandler)))))
+	// Rotas públicas com rate limiting, auditoria, métricas e tracing
+	http.Handle("/auth/register", tracing.TracedHandler(metrics.MetricsMiddleware(auditMiddleware(rateLimitMiddleware(registerHandler)))))
+	http.Handle("/auth/login", tracing.TracedHandler(metrics.MetricsMiddleware(auditMiddleware(rateLimitMiddleware(loginHandler)))))
+	http.Handle("/auth/refresh", tracing.TracedHandler(metrics.MetricsMiddleware(auditMiddleware(rateLimitMiddleware(refreshHandler)))))
+	http.Handle("/health", tracing.TracedHandler(metrics.MetricsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "ok")
+	}))))
+
+	// Rotas protegidas com rate limiting, autenticação, auditoria, métricas e tracing
+	http.Handle("/auth/validate", tracing.TracedHandler(metrics.MetricsMiddleware(auditMiddleware(rateLimitMiddleware(authMiddleware(validateHandler))))))
 
 	// Endpoint do Prometheus
 	http.Handle("/metrics", promhttp.Handler())
